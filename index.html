@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SR Visualizer - Screen Reader Accessibility Viewer</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">👁️‍🗨️</span>
+                <h1>SR Visualizer</h1>
+            </div>
+            <p class="tagline">See what screen readers announce</p>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main">
+            <!-- Input Section -->
+            <section class="input-section" id="input-section">
+                <div class="input-section-header">
+                    <h2>HTML Input</h2>
+                    <button class="btn btn-icon collapse-toggle" id="collapse-toggle" title="Toggle panel">
+                        <span class="collapse-icon">◀</span>
+                    </button>
+                </div>
+                <div class="input-section-content" id="input-section-content">
+                    <div class="tabs">
+                        <button class="tab active" data-tab="samples">Sample Pages</button>
+                        <button class="tab" data-tab="paste">Paste HTML/DOM</button>
+                    </div>
+
+                    <!-- Sample Pages Tab -->
+                    <div class="tab-content active" id="samples-tab">
+                        <div class="sample-grid">
+                            <button class="sample-card" data-sample="good">
+                                <span class="sample-icon">✅</span>
+                                <span class="sample-title">Accessible Page</span>
+                                <span class="sample-desc">Proper labels, headings, landmarks</span>
+                            </button>
+                            <button class="sample-card" data-sample="bad">
+                                <span class="sample-icon">❌</span>
+                                <span class="sample-title">Problematic Page</span>
+                                <span class="sample-desc">Missing labels, no alt text</span>
+                            </button>
+                            <button class="sample-card" data-sample="form">
+                                <span class="sample-icon">📝</span>
+                                <span class="sample-title">Form Example</span>
+                                <span class="sample-desc">Labels, inputs, validation</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Paste HTML Tab -->
+                    <div class="tab-content" id="paste-tab">
+                        <textarea id="html-input" placeholder="Paste your HTML or DOM here..."></textarea>
+                        <button class="btn btn-primary" id="analyze-btn">Analyze</button>
+                        <p class="hint">Tip: In DevTools, right-click an element → Copy → Copy outerHTML</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Visualization Section -->
+            <section class="visualization-section">
+                <div class="viz-header">
+                    <h2>Visualization</h2>
+                    <div class="controls">
+                        <button class="btn btn-icon" id="prev-btn" title="Previous element">◀</button>
+                        <span class="element-counter" id="element-counter">0 / 0</span>
+                        <button class="btn btn-icon" id="next-btn" title="Next element">▶</button>
+                        <button class="btn btn-secondary" id="analyze-ai-btn">🤖 AI Analysis</button>
+                    </div>
+                </div>
+
+                <!-- Side-by-side Preview and SR Output -->
+                <div class="viz-split-container">
+                    <!-- Preview Container -->
+                    <div class="preview-container">
+                        <div class="preview-frame" id="preview-frame">
+                            <p class="placeholder-text">Select a sample or paste HTML to begin</p>
+                        </div>
+                    </div>
+
+                    <!-- Announcement Log -->
+                    <div class="announcement-log">
+                        <h3>Screen Reader Announcements</h3>
+                        <ul id="announcement-list" class="announcement-list">
+                            <li class="placeholder-item">Announcements will appear here...</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- AI Analysis Panel (hidden by default) -->
+        <aside class="ai-panel" id="ai-panel">
+            <div class="ai-panel-header">
+                <h3>🤖 AI Accessibility Analysis</h3>
+                <button class="btn btn-icon" id="close-ai-panel">✕</button>
+            </div>
+            <div class="ai-panel-content" id="ai-results">
+                <p class="ai-placeholder">Click "AI Analysis" to detect accessibility issues</p>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Sample HTML Templates -->
+    <template id="sample-good">
+        <header role="banner">
+            <nav aria-label="Main navigation">
+                <ul>
+                    <li><a href="#home">Home</a></li>
+                    <li><a href="#about">About</a></li>
+                    <li><a href="#contact">Contact</a></li>
+                </ul>
+            </nav>
+        </header>
+        <main>
+            <h1>Welcome to Our Site</h1>
+            <p>This is an accessible web page with proper structure.</p>
+            <section aria-labelledby="features-heading">
+                <h2 id="features-heading">Features</h2>
+                <ul>
+                    <li>Proper heading hierarchy</li>
+                    <li>Labeled navigation</li>
+                    <li>Semantic HTML</li>
+                </ul>
+                <button type="button">Learn More</button>
+            </section>
+            <img src="https://via.placeholder.com/300x200" alt="A placeholder image showing a gray rectangle">
+        </main>
+        <footer role="contentinfo">
+            <p>© 2024 Example Company</p>
+        </footer>
+    </template>
+
+    <template id="sample-bad">
+        <div class="header">
+            <div class="nav">
+                <span onclick="navigate('home')">Home</span>
+                <span onclick="navigate('about')">About</span>
+                <span onclick="navigate('contact')">Contact</span>
+            </div>
+        </div>
+        <div class="content">
+            <div class="title" style="font-size: 24px; font-weight: bold;">Welcome</div>
+            <p>This page has accessibility issues.</p>
+            <div class="section">
+                <div style="font-size: 18px; font-weight: bold;">Features</div>
+                <div class="list">
+                    <div>• No semantic HTML</div>
+                    <div>• Missing landmarks</div>
+                    <div>• Unlabeled elements</div>
+                </div>
+                <div class="btn" onclick="doSomething()">Click Here</div>
+            </div>
+            <img src="https://via.placeholder.com/300x200">
+            <button><svg viewBox="0 0 24 24">
+                    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" />
+                </svg></button>
+        </div>
+        <div class="footer">
+            <p>© 2024</p>
+        </div>
+    </template>
+
+    <template id="sample-form">
+        <main>
+            <h1>Contact Form</h1>
+            <form>
+                <div class="form-group">
+                    <label for="name">Full Name</label>
+                    <input type="text" id="name" name="name" required aria-describedby="name-hint">
+                    <span id="name-hint" class="hint">Enter your first and last name</span>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+                <div class="form-group">
+                    <input type="text" placeholder="Phone (unlabeled - bad!)">
+                </div>
+                <div class="form-group">
+                    <label for="message">Message</label>
+                    <textarea id="message" name="message" rows="4"></textarea>
+                </div>
+                <fieldset>
+                    <legend>Preferred Contact Method</legend>
+                    <label><input type="radio" name="contact" value="email"> Email</label>
+                    <label><input type="radio" name="contact" value="phone"> Phone</label>
+                </fieldset>
+                <button type="submit">Send Message</button>
+            </form>
+        </main>
+    </template>
+
+    <script type="module" src="app.js"></script>
+</body>
+
+</html>

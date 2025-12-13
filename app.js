@@ -8,9 +8,10 @@ import {
 } from './sr-visualizer.js';
 
 import {
-    detectPotentialIssues,
-    formatIssue
-} from './issue-detector.js';
+    runAxeAnalysis,
+    getImpactIcon,
+    formatWcagTags
+} from './axe-analyzer.js';
 
 import {
     hasApiKey,
@@ -24,7 +25,7 @@ import {
 let analysisResults = [];
 let currentIndex = 0;
 let previewContainer = null;
-let detectedIssues = [];
+let axeResults = null;
 
 // DOM Elements
 const tabButtons = document.querySelectorAll('.tab');
@@ -37,10 +38,8 @@ const announcementList = document.getElementById('announcement-list');
 const prevBtn = document.getElementById('prev-btn');
 const nextBtn = document.getElementById('next-btn');
 const elementCounter = document.getElementById('element-counter');
-const analyzeAiBtn = document.getElementById('analyze-ai-btn');
-const aiPanel = document.getElementById('ai-panel');
-const closeAiPanelBtn = document.getElementById('close-ai-panel');
-const aiResults = document.getElementById('ai-results');
+const issuesContent = document.getElementById('issues-content');
+const enhanceAiBtn = document.getElementById('enhance-ai-btn');
 const inputSection = document.getElementById('input-section');
 const collapseToggle = document.getElementById('collapse-toggle');
 const mainContainer = document.querySelector('.main');
@@ -53,7 +52,7 @@ function init() {
     setupSampleCards();
     setupAnalyzeButton();
     setupNavigation();
-    setupAiPanel();
+    setupAiEnhanceButton();
     setupCollapseToggle();
     console.log('🚀 SR Visualizer initialized');
 }
@@ -140,16 +139,11 @@ function setupNavigation() {
 }
 
 /**
- * AI Panel toggle
+ * Setup AI Enhance button
  */
-function setupAiPanel() {
-    analyzeAiBtn.addEventListener('click', () => {
-        aiPanel.classList.add('open');
-        runAiAnalysis();
-    });
-
-    closeAiPanelBtn.addEventListener('click', () => {
-        aiPanel.classList.remove('open');
+function setupAiEnhanceButton() {
+    enhanceAiBtn.addEventListener('click', () => {
+        runAiEnhancement();
     });
 }
 
@@ -160,22 +154,27 @@ async function loadAndAnalyze(html) {
     // Clear previous state
     analysisResults = [];
     currentIndex = 0;
-    detectedIssues = [];
+    axeResults = null;
 
     // Create preview content
     previewFrame.innerHTML = html;
     previewFrame.classList.add('has-content');
     previewContainer = previewFrame;
 
-    // Clear the list and show streaming indicator
-    announcementList.innerHTML = '';
+    // Clear the lists and show loading indicators
+    announcementList.innerHTML = '<li class="loading">Analyzing screen reader output...</li>';
+    issuesContent.innerHTML = '<p class="loading">Running accessibility checks...</p>';
     updateCounter();
 
     try {
-        // Stream results as they're discovered
+        // Run Screen Reader analysis
         console.log('🔍 Starting analysis...');
 
         analysisResults = await analyzeContainer(previewFrame, (result, count) => {
+            // Clear loading message on first result
+            if (count === 1) {
+                announcementList.innerHTML = '';
+            }
             // Add each announcement to the list as it's found
             addAnnouncementToList(result);
             elementCounter.textContent = `${count} found...`;
@@ -188,7 +187,7 @@ async function loadAndAnalyze(html) {
             updateAnnouncementList();
         }
 
-        console.log('📊 Analysis complete:', analysisResults.length, 'items');
+        console.log('📊 SR Analysis complete:', analysisResults.length, 'items');
 
         // Update final counter
         updateCounter();
@@ -200,7 +199,7 @@ async function loadAndAnalyze(html) {
         }
 
     } catch (error) {
-        console.error('❌ Analysis failed:', error);
+        console.error('❌ SR Analysis failed:', error);
 
         // Fallback to simple analysis
         console.log('🔄 Using fallback analysis due to error');
@@ -211,6 +210,15 @@ async function loadAndAnalyze(html) {
         if (analysisResults.length === 0) {
             announcementList.innerHTML = `<li class="error">Error: ${error.message}</li>`;
         }
+    }
+
+    // Run Axe-core analysis (in parallel with display updates)
+    try {
+        axeResults = await runAxeAnalysis(previewFrame);
+        renderAxeResults(axeResults);
+    } catch (error) {
+        console.error('❌ Axe analysis failed:', error);
+        issuesContent.innerHTML = `<p class="error" style="color: var(--accent-red);">Axe analysis failed: ${error.message}</p>`;
     }
 }
 
@@ -280,219 +288,220 @@ function updateCounter() {
 }
 
 /**
- * Run AI analysis on detected issues
+ * Render Axe-core analysis results
  */
-async function runAiAnalysis() {
-    // Detect potential issues using improved detection
-    detectedIssues = detectPotentialIssues(analysisResults, previewContainer);
+function renderAxeResults(results) {
+    issuesContent.innerHTML = '';
 
-    console.log('🔍 Detected issues:', detectedIssues);
+    const violations = results.violations;
+    const incomplete = results.incomplete;
 
-    if (detectedIssues.length === 0) {
-        aiResults.innerHTML = `
-            <div class="ai-success" style="text-align: center; padding: 24px;">
-                <span style="font-size: 3rem;">✅</span>
-                <h4 style="margin: 16px 0 8px;">No Obvious Issues Found</h4>
-                <p style="color: var(--text-secondary); font-size: 0.9rem;">
-                    This doesn't guarantee full WCAG compliance.<br>
-                    Always test with real screen readers and users.
+    // No issues found
+    if (violations.length === 0 && incomplete.length === 0) {
+        issuesContent.innerHTML = `
+            <div style="text-align: center; padding: 16px;">
+                <span style="font-size: 2rem;">✅</span>
+                <p style="margin: 8px 0 0; color: var(--text-secondary); font-size: 0.85rem;">
+                    No WCAG violations detected!<br>
+                    <small>Note: Always test with real screen readers too.</small>
                 </p>
             </div>
         `;
         return;
     }
 
-    // Show issues first with basic suggestions
-    renderIssues(detectedIssues);
-
-    // Then try to enhance with AI
-    if (hasApiKey()) {
-        await enhanceWithAI();
-    }
-}
-
-/**
- * Render detected issues
- */
-function renderIssues(issues, aiAnalysis = null) {
-    aiResults.innerHTML = '';
-
     // Summary
-    const errorCount = issues.filter(i => i.severity === 'error').length;
-    const warningCount = issues.filter(i => i.severity === 'warning').length;
-
-    const header = document.createElement('div');
-    header.className = 'ai-summary';
-    header.style.cssText = 'margin-bottom: 16px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px;';
-
-    let scoreHtml = '';
-    if (aiAnalysis?.overallScore !== undefined && aiAnalysis.overallScore !== null) {
-        const score = aiAnalysis.overallScore;
-        const scoreColor = score >= 80 ? 'var(--accent-green)' : score >= 50 ? 'var(--accent-orange)' : 'var(--accent-red)';
-        scoreHtml = `<div style="margin-top: 8px; font-size: 1.2rem;"><strong style="color: ${scoreColor};">Accessibility Score: ${score}/100</strong></div>`;
-    }
-
-    header.innerHTML = `
-        <strong>Found ${issues.length} issue${issues.length !== 1 ? 's' : ''}:</strong>
-        <span style="color: var(--accent-red); margin-left: 12px;">🔴 ${errorCount} error${errorCount !== 1 ? 's' : ''}</span>
-        <span style="color: var(--accent-orange); margin-left: 8px;">🟠 ${warningCount} warning${warningCount !== 1 ? 's' : ''}</span>
-        ${scoreHtml}
+    const summary = document.createElement('div');
+    summary.className = 'issues-summary';
+    summary.innerHTML = `
+        <span class="issues-summary-item">🔴 <strong>${violations.length}</strong> violations</span>
+        <span class="issues-summary-item">🟡 <strong>${incomplete.length}</strong> needs review</span>
+        <span class="issues-summary-item">✅ <strong>${results.passes}</strong> passed</span>
     `;
-    aiResults.appendChild(header);
+    issuesContent.appendChild(summary);
 
-    // AI summary if available
-    if (aiAnalysis?.summary) {
-        const summaryDiv = document.createElement('div');
-        summaryDiv.style.cssText = 'margin-bottom: 16px; padding: 12px; background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(34,197,94,0.1)); border-radius: 8px; border-left: 3px solid var(--accent-blue);';
-        summaryDiv.innerHTML = `<p style="margin: 0; color: var(--text-primary);"><strong>🤖 AI Summary:</strong> ${aiAnalysis.summary}</p>`;
-        aiResults.appendChild(summaryDiv);
-    }
-
-    // Issue cards
-    issues.forEach((issue, idx) => {
-        const formatted = formatIssue(issue);
-
-        // Check if AI provided enhanced suggestion for this issue
-        const aiIssue = aiAnalysis?.issues?.find(ai => ai.issueIndex === idx);
-
-        const card = document.createElement('div');
-        card.className = `ai-issue ${issue.severity === 'error' ? '' : 'warning'}`;
-
-        let suggestionHtml = `<strong>💡 Suggested fix:</strong><br><code>${formatted.suggestion}</code>`;
-
-        if (aiIssue) {
-            const confidenceColor = aiIssue.confidence === 'high' ? 'var(--accent-green)' :
-                aiIssue.confidence === 'medium' ? 'var(--accent-orange)' : 'var(--text-muted)';
-            suggestionHtml = `
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                    <strong>🤖 AI Suggestion:</strong>
-                    <span style="font-size: 0.75rem; padding: 2px 6px; border-radius: 3px; background: ${confidenceColor}; color: white;">${aiIssue.confidence} confidence</span>
-                </div>
-                <code>${aiIssue.aiSuggestion}</code>
-                ${aiIssue.explanation ? `<p style="margin: 8px 0 0; font-size: 0.8rem; color: var(--text-secondary);">${aiIssue.explanation}</p>` : ''}
-            `;
-        }
-
-        card.innerHTML = `
-            <div class="ai-issue-header">
-                <span style="font-size: 1.2rem;">${formatted.icon}</span>
-                <span class="ai-issue-type">${formatted.label}</span>
-                <span style="margin-left: auto; font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; background: ${issue.severity === 'error' ? 'var(--accent-red)' : 'var(--accent-orange)'}; color: white;">
-                    ${issue.severity}
-                </span>
-            </div>
-            <p class="ai-issue-explanation">${issue.description}</p>
-            <div class="ai-issue-fix">
-                ${suggestionHtml}
-            </div>
-        `;
-
-        aiResults.appendChild(card);
+    // Violations
+    violations.forEach(violation => {
+        const card = createAxeIssueCard(violation, 'violation');
+        issuesContent.appendChild(card);
     });
 
-    // API key configuration section
-    const apiSection = document.createElement('div');
-    apiSection.style.cssText = 'margin-top: 20px; padding: 16px; background: linear-gradient(135deg, rgba(168,85,247,0.1), rgba(59,130,246,0.1)); border-radius: 8px; border: 1px solid rgba(168,85,247,0.2);';
+    // Incomplete (needs review)
+    if (incomplete.length > 0) {
+        const reviewHeader = document.createElement('p');
+        reviewHeader.style.cssText = 'margin: 12px 0 8px; font-size: 0.8rem; color: var(--text-muted);';
+        reviewHeader.textContent = '⚠️ Needs manual review:';
+        issuesContent.appendChild(reviewHeader);
 
-    if (hasApiKey()) {
-        apiSection.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                <span style="font-size: 1.2rem;">🤖</span>
-                <strong>Gemini AI Connected</strong>
-                <span style="margin-left: auto; color: var(--accent-green);">✓ Active</span>
-            </div>
-            <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">
-                AI is analyzing your page for contextual suggestions.
-            </p>
-            <button id="clear-api-key" style="margin-top: 8px; padding: 4px 12px; background: transparent; border: 1px solid var(--text-muted); border-radius: 4px; color: var(--text-muted); cursor: pointer; font-size: 0.8rem;">
-                Clear API Key
-            </button>
-        `;
-    } else {
-        apiSection.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-                <span style="font-size: 1.2rem;">🤖</span>
-                <strong>Enable AI Enhancement</strong>
-            </div>
-            <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0 0 12px;">
-                Connect Gemini API for intelligent suggestions based on visual context.
-            </p>
-            <div style="display: flex; gap: 8px;">
-                <input type="password" id="api-key-input" placeholder="Enter Gemini API Key" 
-                    style="flex: 1; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--bg-elevated); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem;">
-                <button id="save-api-key" style="padding: 8px 16px; background: var(--accent-purple); border: none; border-radius: 6px; color: white; cursor: pointer; font-weight: 500;">
-                    Connect
-                </button>
-            </div>
-            <p style="color: var(--text-muted); font-size: 0.75rem; margin: 8px 0 0;">
-                Get a free API key at <a href="https://aistudio.google.com/apikey" target="_blank" style="color: var(--accent-blue);">aistudio.google.com/apikey</a>
-            </p>
-        `;
-    }
-
-    aiResults.appendChild(apiSection);
-
-    // Add event listeners for API key management
-    const saveBtn = document.getElementById('save-api-key');
-    const clearBtn = document.getElementById('clear-api-key');
-
-    if (saveBtn) {
-        saveBtn.addEventListener('click', async () => {
-            const input = document.getElementById('api-key-input');
-            const key = input.value.trim();
-            if (key) {
-                setApiKey(key);
-                // Re-render and enhance with AI
-                renderIssues(detectedIssues);
-                await enhanceWithAI();
-            }
-        });
-    }
-
-    if (clearBtn) {
-        clearBtn.addEventListener('click', () => {
-            clearApiKey();
-            location.reload();
+        incomplete.forEach(issue => {
+            const card = createAxeIssueCard(issue, 'incomplete');
+            issuesContent.appendChild(card);
         });
     }
 }
 
 /**
- * Enhance issues with Gemini AI analysis
+ * Create an Axe issue card element
  */
-async function enhanceWithAI() {
-    if (!previewContainer || detectedIssues.length === 0) return;
+function createAxeIssueCard(issue, type = 'violation') {
+    const card = document.createElement('div');
+    card.className = `axe-issue ${issue.impact || 'moderate'}`;
+    card.dataset.issueId = issue.id;
 
-    // Show loading indicator
-    const loadingDiv = document.createElement('div');
-    loadingDiv.className = 'ai-loading';
-    loadingDiv.style.cssText = 'position: fixed; bottom: 20px; right: 420px; padding: 12px 20px; background: var(--bg-elevated); border-radius: 8px; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);';
-    loadingDiv.innerHTML = '<div class="loading" style="padding: 0;"></div><span>Gemini analyzing...</span>';
-    document.body.appendChild(loadingDiv);
+    const tags = formatWcagTags(issue.tags);
+    const icon = getImpactIcon(issue.impact);
+
+    card.innerHTML = `
+        <div class="axe-issue-header">
+            <span>${icon}</span>
+            <span class="axe-issue-impact">${issue.impact || 'unknown'}</span>
+            <span class="axe-issue-title">${issue.help}</span>
+        </div>
+        <p class="axe-issue-description">${issue.description}</p>
+        <div class="axe-issue-tags">
+            ${tags.map(tag => `<span class="axe-tag">${tag}</span>`).join('')}
+        </div>
+        <div class="axe-issue-help">
+            <a href="${issue.helpUrl}" target="_blank" rel="noopener">Learn more →</a>
+        </div>
+    `;
+
+    return card;
+}
+
+/**
+ * Run AI Enhancement on Axe results
+ */
+async function runAiEnhancement() {
+    if (!axeResults || !previewContainer) {
+        issuesContent.innerHTML += `
+            <p style="color: var(--accent-orange); font-size: 0.85rem; margin-top: 12px;">
+                ⚠️ Please analyze a page first before enhancing with AI.
+            </p>
+        `;
+        return;
+    }
+
+    // Check for API key
+    if (!hasApiKey()) {
+        showApiKeyPrompt();
+        return;
+    }
+
+    // Show loading state on button
+    enhanceAiBtn.disabled = true;
+    enhanceAiBtn.innerHTML = '⏳ Analyzing...';
 
     try {
         console.log('📸 Capturing screenshot for Gemini...');
         const imageBase64 = await capturePreview(previewContainer);
 
+        // Build issues list for Gemini
+        const issuesForAi = axeResults.violations.map(v => ({
+            type: v.id,
+            description: v.description,
+            impact: v.impact
+        }));
+
         console.log('🤖 Sending to Gemini API...');
-        const aiAnalysis = await analyzeIssuesWithGemini(detectedIssues, imageBase64, analysisResults);
+        const aiAnalysis = await analyzeIssuesWithGemini(issuesForAi, imageBase64, analysisResults);
 
         console.log('✅ AI Analysis result:', aiAnalysis);
 
-        // Re-render with AI enhancements
-        renderIssues(detectedIssues, aiAnalysis);
+        // Add AI suggestions to existing cards
+        renderAiSuggestions(aiAnalysis);
+
+        enhanceAiBtn.innerHTML = '✅ AI Enhanced';
 
     } catch (error) {
         console.error('❌ AI enhancement failed:', error);
 
-        // Show error but keep existing issues
-        const errorDiv = document.createElement('div');
-        errorDiv.style.cssText = 'margin-top: 12px; padding: 12px; background: rgba(239,68,68,0.1); border-radius: 8px; border-left: 3px solid var(--accent-red);';
-        errorDiv.innerHTML = `<p style="margin: 0; color: var(--accent-red); font-size: 0.85rem;">⚠️ AI enhancement failed: ${error.message}</p>`;
-        aiResults.insertBefore(errorDiv, aiResults.querySelector('[style*="linear-gradient"]'));
+        const errorMsg = document.createElement('div');
+        errorMsg.style.cssText = 'margin-top: 12px; padding: 8px 12px; background: rgba(239,68,68,0.1); border-radius: 6px; border-left: 2px solid var(--accent-red);';
+        errorMsg.innerHTML = `<p style="margin: 0; color: var(--accent-red); font-size: 0.8rem;">⚠️ AI enhancement failed: ${error.message}</p>`;
+        issuesContent.appendChild(errorMsg);
+
+        enhanceAiBtn.innerHTML = '🤖 Retry AI';
     } finally {
-        loadingDiv.remove();
+        enhanceAiBtn.disabled = false;
     }
+}
+
+/**
+ * Show API key prompt in issues panel
+ */
+function showApiKeyPrompt() {
+    const promptDiv = document.createElement('div');
+    promptDiv.className = 'ai-key-prompt';
+    promptDiv.style.cssText = 'margin-top: 12px; padding: 12px; background: linear-gradient(135deg, rgba(168,85,247,0.1), rgba(59,130,246,0.1)); border-radius: 8px; border: 1px solid rgba(168,85,247,0.2);';
+    promptDiv.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <span>🤖</span>
+            <strong style="font-size: 0.85rem;">Enter Gemini API Key</strong>
+        </div>
+        <div style="display: flex; gap: 8px;">
+            <input type="password" id="inline-api-key" placeholder="API Key" 
+                style="flex: 1; padding: 6px 10px; background: var(--bg-tertiary); border: 1px solid var(--bg-elevated); border-radius: 4px; color: var(--text-primary); font-size: 0.85rem;">
+            <button id="inline-save-key" class="btn btn-sm btn-ai">Connect</button>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.7rem; margin: 6px 0 0;">
+            Get a key at <a href="https://aistudio.google.com/apikey" target="_blank" style="color: var(--accent-blue);">aistudio.google.com/apikey</a>
+        </p>
+    `;
+
+    // Remove existing prompt if any
+    const existingPrompt = issuesContent.querySelector('.ai-key-prompt');
+    if (existingPrompt) existingPrompt.remove();
+
+    issuesContent.appendChild(promptDiv);
+
+    // Handle save
+    document.getElementById('inline-save-key').addEventListener('click', async () => {
+        const key = document.getElementById('inline-api-key').value.trim();
+        if (key) {
+            setApiKey(key);
+            promptDiv.remove();
+            await runAiEnhancement();
+        }
+    });
+}
+
+/**
+ * Render AI suggestions on existing issue cards
+ */
+function renderAiSuggestions(aiAnalysis) {
+    if (!aiAnalysis?.issues) return;
+
+    // Add overall summary
+    if (aiAnalysis.summary) {
+        const summaryEl = document.querySelector('.issues-summary');
+        if (summaryEl) {
+            const aiSummary = document.createElement('div');
+            aiSummary.style.cssText = 'margin-top: 12px; padding: 10px; background: linear-gradient(135deg, rgba(168,85,247,0.1), rgba(59,130,246,0.1)); border-radius: 6px; font-size: 0.8rem;';
+            aiSummary.innerHTML = `<strong>🤖 AI Summary:</strong> ${aiAnalysis.summary}`;
+            summaryEl.after(aiSummary);
+        }
+    }
+
+    // Add suggestions to each issue card
+    aiAnalysis.issues.forEach((aiIssue, index) => {
+        const cards = issuesContent.querySelectorAll('.axe-issue');
+        const card = cards[index];
+        if (!card) return;
+
+        // Remove existing AI suggestion if any
+        const existingSuggestion = card.querySelector('.ai-suggestion');
+        if (existingSuggestion) existingSuggestion.remove();
+
+        const suggestionDiv = document.createElement('div');
+        suggestionDiv.className = 'ai-suggestion';
+        suggestionDiv.innerHTML = `
+            <div class="ai-suggestion-header">🤖 AI Suggestion</div>
+            <p class="ai-suggestion-text">${aiIssue.aiSuggestion}</p>
+            ${aiIssue.explanation ? `<p style="margin-top: 4px; font-size: 0.75rem; color: var(--text-secondary);">${aiIssue.explanation}</p>` : ''}
+        `;
+        card.appendChild(suggestionDiv);
+    });
 }
 
 // Initialize when DOM is ready

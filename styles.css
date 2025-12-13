@@ -1,21 +1,27 @@
 /* SR Visualizer - Styles */
 
 :root {
-    /* Colors */
-    --bg-primary: #0a0a0f;
-    --bg-secondary: #12121a;
-    --bg-tertiary: #1a1a25;
-    --bg-elevated: #22222f;
+    /* Colors - OffBrand inspired yellow/gold theme */
+    --bg-primary: #000000;
+    --bg-secondary: #0a0a0a;
+    --bg-tertiary: #141414;
+    --bg-elevated: #1a1a1a;
 
-    --text-primary: #f0f0f5;
-    --text-secondary: #a0a0b0;
-    --text-muted: #606070;
+    --text-primary: #ffffff;
+    --text-secondary: #a0a0a0;
+    --text-muted: #666666;
 
-    --accent-blue: #3b82f6;
+    --accent-primary: #ffd60a;
+    --accent-yellow: #ffd60a;
+    --accent-blue: #ffd60a;
     --accent-orange: #f97316;
     --accent-green: #22c55e;
-    --accent-purple: #a855f7;
+    --accent-purple: #ffd60a;
     --accent-red: #ef4444;
+
+    /* Fonts */
+    --font-heading: 'Playfair Display', Georgia, serif;
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 
     /* Overlay Colors */
     --overlay-landmark: rgba(59, 130, 246, 0.3);
@@ -54,7 +60,7 @@
 }
 
 body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: var(--font-body);
     background: var(--bg-primary);
     color: var(--text-primary);
     line-height: 1.6;
@@ -86,12 +92,11 @@ body {
 }
 
 .logo h1 {
-    font-size: 1.75rem;
-    font-weight: 700;
-    background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    font-family: var(--font-heading);
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--accent-yellow);
+    letter-spacing: -0.02em;
 }
 
 .tagline {
@@ -144,8 +149,9 @@ body {
 }
 
 .input-section-header h2 {
-    font-size: 1rem;
-    font-weight: 600;
+    font-family: var(--font-heading);
+    font-size: 1.2rem;
+    font-weight: 700;
     white-space: nowrap;
     overflow: hidden;
 }
@@ -306,12 +312,14 @@ body {
 }
 
 .btn-primary {
-    background: var(--accent-blue);
-    color: white;
+    background: var(--accent-yellow);
+    color: #000000;
+    font-weight: 600;
 }
 
 .btn-primary:hover {
-    background: #2563eb;
+    background: #e6c109;
+    transform: translateY(-1px);
 }
 
 .btn-secondary {
@@ -356,8 +364,9 @@ body {
 }
 
 .viz-header h2 {
-    font-size: 1.2rem;
-    font-weight: 600;
+    font-family: var(--font-heading);
+    font-size: 1.4rem;
+    font-weight: 700;
 }
 
 .controls {
@@ -691,4 +700,217 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
     background: #333340;
+}
+
+/* Output Panel - Split SR and Issues */
+.output-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    height: 100%;
+    overflow: hidden;
+}
+
+.output-panel .announcement-log {
+    flex: 1;
+    min-height: 150px;
+    height: auto;
+}
+
+/* Issues Section */
+.issues-section {
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    flex: 1;
+    min-height: 150px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.issues-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-sm);
+}
+
+.issues-header h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.issues-content {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.issues-content .placeholder-item {
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 0.85rem;
+}
+
+/* AI Button Styles */
+.btn-sm {
+    padding: var(--space-xs) var(--space-sm);
+    font-size: 0.8rem;
+}
+
+.btn-ai {
+    background: var(--accent-yellow);
+    color: #000000;
+    border: none;
+    font-weight: 600;
+}
+
+.btn-ai:hover {
+    background: #e6c109;
+    transform: translateY(-1px);
+}
+
+.btn-ai:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Axe Issue Cards */
+.axe-issue {
+    background: var(--bg-elevated);
+    border-radius: var(--radius-sm);
+    padding: var(--space-sm) var(--space-md);
+    margin-bottom: var(--space-sm);
+    border-left: 3px solid var(--accent-red);
+}
+
+.axe-issue.serious {
+    border-left-color: var(--accent-orange);
+}
+
+.axe-issue.moderate {
+    border-left-color: #f59e0b;
+}
+
+.axe-issue.minor {
+    border-left-color: var(--accent-blue);
+}
+
+.axe-issue-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-xs);
+}
+
+.axe-issue-impact {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: var(--accent-red);
+    color: white;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.axe-issue.serious .axe-issue-impact {
+    background: var(--accent-orange);
+}
+
+.axe-issue.moderate .axe-issue-impact {
+    background: #f59e0b;
+}
+
+.axe-issue.minor .axe-issue-impact {
+    background: var(--accent-blue);
+}
+
+.axe-issue-title {
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.axe-issue-description {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-xs);
+}
+
+.axe-issue-tags {
+    display: flex;
+    gap: var(--space-xs);
+    flex-wrap: wrap;
+}
+
+.axe-tag {
+    font-size: 0.65rem;
+    padding: 1px 5px;
+    border-radius: 2px;
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+}
+
+.axe-issue-help {
+    margin-top: var(--space-xs);
+}
+
+.axe-issue-help a {
+    font-size: 0.75rem;
+    color: var(--accent-blue);
+    text-decoration: none;
+}
+
+.axe-issue-help a:hover {
+    text-decoration: underline;
+}
+
+/* Issues Summary */
+.issues-summary {
+    display: flex;
+    gap: var(--space-md);
+    padding: var(--space-sm);
+    background: var(--bg-elevated);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--space-md);
+    font-size: 0.85rem;
+}
+
+.issues-summary-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+/* AI Suggestions within Axe Issues */
+.ai-suggestion {
+    margin-top: var(--space-sm);
+    padding: var(--space-sm);
+    background: rgba(168, 85, 247, 0.1);
+    border-radius: var(--radius-sm);
+    border-left: 2px solid var(--accent-purple);
+}
+
+.ai-suggestion-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent-purple);
+    margin-bottom: var(--space-xs);
+}
+
+.ai-suggestion-text {
+    font-size: 0.8rem;
+    color: var(--text-primary);
+}
+
+.ai-suggestion code {
+    background: var(--bg-tertiary);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-size: 0.75rem;
 }

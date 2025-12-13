@@ -92,6 +92,9 @@ Respond as a JSON object with this structure:
   "summary": "brief accessibility summary"
 }`;
 
+    console.log('🔑 Making Gemini API call with key:', key.substring(0, 8) + '...');
+    console.log('📸 Image data length:', imageBase64.length);
+
     const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro:generateContent?key=${key}`,
         {
@@ -122,8 +125,11 @@ Respond as a JSON object with this structure:
         }
     );
 
+    console.log('📡 Response status:', response.status, response.statusText);
+
     if (!response.ok) {
         const error = await response.json();
+        console.error('❌ Gemini API error:', error);
         throw new Error(`Gemini API error: ${error.error?.message || 'Unknown error'}`);
     }
 

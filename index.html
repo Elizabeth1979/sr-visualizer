@@ -6,7 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SR Visualizer - Screen Reader Accessibility Viewer</title>
     <link rel="stylesheet" href="styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700;800;900&display=swap"
+        rel="stylesheet">
 </head>
 
 <body>
@@ -74,7 +76,6 @@
                         <button class="btn btn-icon" id="prev-btn" title="Previous element">◀</button>
                         <span class="element-counter" id="element-counter">0 / 0</span>
                         <button class="btn btn-icon" id="next-btn" title="Next element">▶</button>
-                        <button class="btn btn-secondary" id="analyze-ai-btn">🤖 AI Analysis</button>
                     </div>
                 </div>
 
@@ -87,27 +88,32 @@
                         </div>
                     </div>
 
-                    <!-- Announcement Log -->
-                    <div class="announcement-log">
-                        <h3>Screen Reader Announcements</h3>
-                        <ul id="announcement-list" class="announcement-list">
-                            <li class="placeholder-item">Announcements will appear here...</li>
-                        </ul>
+                    <!-- Output Panel - Split into SR and Issues -->
+                    <div class="output-panel">
+                        <!-- Screen Reader Announcements -->
+                        <div class="announcement-log">
+                            <h3>🔊 Screen Reader Output</h3>
+                            <ul id="announcement-list" class="announcement-list">
+                                <li class="placeholder-item">Announcements will appear here...</li>
+                            </ul>
+                        </div>
+
+                        <!-- Accessibility Issues -->
+                        <div class="issues-section" id="issues-section">
+                            <div class="issues-header">
+                                <h3>⚠️ Accessibility Issues</h3>
+                                <button class="btn btn-sm btn-ai" id="enhance-ai-btn" title="Enhance with AI">
+                                    🤖 Enhance with AI
+                                </button>
+                            </div>
+                            <div class="issues-content" id="issues-content">
+                                <p class="placeholder-item">Issues will appear after analysis...</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
         </main>
-
-        <!-- AI Analysis Panel (hidden by default) -->
-        <aside class="ai-panel" id="ai-panel">
-            <div class="ai-panel-header">
-                <h3>🤖 AI Accessibility Analysis</h3>
-                <button class="btn btn-icon" id="close-ai-panel">✕</button>
-            </div>
-            <div class="ai-panel-content" id="ai-results">
-                <p class="ai-placeholder">Click "AI Analysis" to detect accessibility issues</p>
-            </div>
-        </aside>
     </div>
 
     <!-- Sample HTML Templates -->

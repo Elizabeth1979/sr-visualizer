@@ -1460,3 +1460,77 @@ body {
 }
 
 /* TTS button speaking state now handled by mode-specific styles above */
+
+/* Accessibility Utilities */
+/* Screen reader only content - visually hidden but announced */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+}
+
+.sr-only:not(caption) {
+    position: absolute !important;
+}
+
+/* Enhanced focus visibility for keyboard users */
+*:focus-visible {
+    outline: 2px solid var(--accent-yellow);
+    outline-offset: 2px;
+}
+
+.btn:focus-visible,
+.sample-card:focus-visible,
+.tab:focus-visible {
+    outline: 2px solid var(--accent-yellow);
+    outline-offset: 3px;
+    box-shadow: 0 0 0 4px rgba(255, 214, 10, 0.2);
+}
+
+.announcement-list li:focus-visible {
+    outline: 2px solid var(--accent-yellow);
+    outline-offset: -2px;
+}
+
+/* Keyboard hint indicator */
+.keyboard-hint {
+    position: fixed;
+    bottom: var(--space-lg);
+    right: var(--space-lg);
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--bg-elevated);
+    border: 1px solid rgba(255, 214, 10, 0.3);
+    border-radius: var(--radius-sm);
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    z-index: 100;
+}
+
+body:focus-within .keyboard-hint {
+    opacity: 0.7;
+}
+
+.keyboard-hint:hover {
+    opacity: 1;
+}
+
+kbd {
+    display: inline-block;
+    padding: 2px 6px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--bg-elevated);
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 0.9em;
+    color: var(--accent-yellow);
+}

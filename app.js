@@ -71,6 +71,7 @@ function init() {
     setupSampleCards();
     setupAnalyzeButton();
     setupNavigation();
+    setupKeyboardNavigation();
     setupAiEnhanceButton();
     setupModal();
     setupClearApiKeyButton();
@@ -79,6 +80,31 @@ function init() {
     setupNewAnalysisButton();
 
     console.log('✅ SR Visualizer initialized');
+}
+
+/**
+ * Announce message to screen readers via live region
+ * @param {string} message - Message to announce
+ * @param {boolean} assertive - Use assertive (true) or polite (false)
+ */
+function announceToScreenReader(message, assertive = false) {
+    const statusEl = document.getElementById('sr-status');
+    if (!statusEl) return;
+
+    // Change role if assertive needed
+    if (assertive) {
+        statusEl.setAttribute('aria-live', 'assertive');
+    } else {
+        statusEl.setAttribute('aria-live', 'polite');
+    }
+
+    statusEl.textContent = message;
+
+    // Clear after announcement to allow duplicate announcements
+    setTimeout(() => {
+        statusEl.textContent = '';
+        statusEl.setAttribute('aria-live', 'polite'); // Reset to polite
+    }, 1000);
 }
 
 /**
@@ -190,6 +216,100 @@ function setupNavigation() {
             updateCurrentElement();
         }
     });
+}
+
+/**
+ * Setup keyboard navigation shortcuts
+ */
+function setupKeyboardNavigation() {
+    document.addEventListener('keydown', (e) => {
+        // Skip if in input or modal open
+        if (e.target.matches('input, textarea, select')) return;
+        if (apiKeyModal.classList.contains('open')) return;
+
+        switch(e.key) {
+            case 'ArrowRight':
+            case 'ArrowDown':
+                e.preventDefault();
+                if (analysisResults.length > 0 && currentIndex < analysisResults.length - 1) {
+                    currentIndex++;
+                    updateCurrentElement();
+                }
+                break;
+
+            case 'ArrowLeft':
+            case 'ArrowUp':
+                e.preventDefault();
+                if (analysisResults.length > 0 && currentIndex > 0) {
+                    currentIndex--;
+                    updateCurrentElement();
+                }
+                break;
+
+            case 'Home':
+                e.preventDefault();
+                if (analysisResults.length > 0) {
+                    currentIndex = 0;
+                    updateCurrentElement();
+                }
+                break;
+
+            case 'End':
+                e.preventDefault();
+                if (analysisResults.length > 0) {
+                    currentIndex = analysisResults.length - 1;
+                    updateCurrentElement();
+                }
+                break;
+
+            case ' ':
+            case 'Enter':
+                // Only trigger if body or TTS button has focus
+                if (e.target === document.body || e.target === ttsToggleBtn) {
+                    e.preventDefault();
+                    ttsToggleBtn.click();
+                }
+                break;
+
+            case 'Escape':
+                // Stop TTS if playing
+                if (ttsPlaying || window.speechSynthesis.speaking) {
+                    e.preventDefault();
+                    stopNarration();
+                    window.speechSynthesis.cancel();
+                }
+                break;
+
+            case '?':
+                e.preventDefault();
+                showKeyboardHelp();
+                break;
+        }
+    });
+
+    console.log('⌨️ Keyboard navigation enabled');
+}
+
+/**
+ * Show keyboard shortcuts help
+ */
+function showKeyboardHelp() {
+    const helpText = `Keyboard Shortcuts:
+
+Navigation:
+  ← / ↑  Previous element
+  → / ↓  Next element
+  Home   First element
+  End    Last element
+
+Text-to-Speech:
+  Space/Enter  Play/pause
+  Esc          Stop
+
+Help:
+  ?  Show this help`;
+
+    alert(helpText);
 }
 
 /**
@@ -435,6 +555,7 @@ async function loadAndAnalyze(html) {
             // Clear loading message on first result
             if (count === 1) {
                 announcementList.innerHTML = '';
+                announceToScreenReader('Analysis started. Please wait.');
             }
             // Add each announcement to the list as it's found
             addAnnouncementToList(result);
@@ -449,6 +570,7 @@ async function loadAndAnalyze(html) {
         }
 
         console.log('📊 SR Analysis complete:', analysisResults.length, 'items');
+        announceToScreenReader(`Screen reader analysis complete. Found ${analysisResults.length} elements.`);
 
         // Update final counter
         updateCounter();
@@ -477,6 +599,13 @@ async function loadAndAnalyze(html) {
     try {
         axeResults = await runAxeAnalysis(previewFrame);
         renderAxeResults(axeResults);
+
+        const violationCount = axeResults.violations.length;
+        announceToScreenReader(
+            violationCount === 0
+                ? 'No accessibility violations found.'
+                : `Found ${violationCount} accessibility ${violationCount === 1 ? 'violation' : 'violations'}.`
+        );
 
         // Enable AI Enhance button after analysis completes
         enhanceAiBtn.disabled = false;

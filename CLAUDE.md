@@ -18,8 +18,7 @@ npx serve .
 ```
 
 Alternative serving methods:
-- `python -m http.server 3000`
--           ´´    ´`php -S localhost:3000`
+- `php -S localhost:3000`
 - Any static file server
 
 ## Architecture

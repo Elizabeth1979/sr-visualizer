@@ -242,7 +242,17 @@ function setupModal() {
 function openApiKeyModal(errorMessage = null) {
     apiKeyModal.classList.add('open');
     modalApiKeyInput.value = '';
-    modalApiKeyInput.focus();
+
+    // Store element that opened modal for focus return
+    const previouslyFocused = document.activeElement;
+    if (previouslyFocused && previouslyFocused !== document.body) {
+        apiKeyModal.dataset.returnFocusTo = previouslyFocused.id || '';
+    }
+
+    // Focus input after modal is visible
+    setTimeout(() => {
+        modalApiKeyInput.focus();
+    }, 100);
 
     // Show error message if provided
     if (errorMessage) {
@@ -251,6 +261,9 @@ function openApiKeyModal(errorMessage = null) {
     } else {
         modalError.style.display = 'none';
     }
+
+    // Setup focus trap
+    setupModalFocusTrap();
 }
 
 /**
@@ -262,6 +275,62 @@ function closeApiKeyModal() {
     modalError.style.display = 'none';
     modalSaveBtn.disabled = false;
     modalSaveBtn.textContent = 'Connect & Analyze';
+
+    // Remove focus trap
+    if (apiKeyModal._focusTrapHandler) {
+        apiKeyModal.removeEventListener('keydown', apiKeyModal._focusTrapHandler);
+        apiKeyModal._focusTrapHandler = null;
+    }
+
+    // Restore focus to element that opened modal
+    const returnId = apiKeyModal.dataset.returnFocusTo;
+    if (returnId) {
+        const returnElement = document.getElementById(returnId);
+        if (returnElement) {
+            setTimeout(() => returnElement.focus(), 100);
+        }
+    }
+}
+
+/**
+ * Setup focus trap for modal
+ */
+function setupModalFocusTrap() {
+    // Get all focusable elements within modal
+    const focusableSelector = 'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const focusableElements = Array.from(apiKeyModal.querySelectorAll(focusableSelector));
+
+    if (focusableElements.length === 0) return;
+
+    const firstFocusable = focusableElements[0];
+    const lastFocusable = focusableElements[focusableElements.length - 1];
+
+    // Remove previous handler if exists
+    if (apiKeyModal._focusTrapHandler) {
+        apiKeyModal.removeEventListener('keydown', apiKeyModal._focusTrapHandler);
+    }
+
+    // Create new trap handler
+    apiKeyModal._focusTrapHandler = (e) => {
+        // Only trap Tab key
+        if (e.key !== 'Tab') return;
+
+        if (e.shiftKey) {
+            // Shift+Tab: if on first element, move to last
+            if (document.activeElement === firstFocusable) {
+                e.preventDefault();
+                lastFocusable.focus();
+            }
+        } else {
+            // Tab: if on last element, move to first
+            if (document.activeElement === lastFocusable) {
+                e.preventDefault();
+                firstFocusable.focus();
+            }
+        }
+    };
+
+    apiKeyModal.addEventListener('keydown', apiKeyModal._focusTrapHandler);
 }
 
 /**
@@ -586,6 +655,30 @@ function createIssueTableRow(issue, type = 'violation') {
         'minor': 'MINOR'
     }[issue.impact] || 'UNKNOWN';
 
+    // Extract unique fix messages from all nodes
+    const allFixes = new Set();
+    if (issue.nodes && Array.isArray(issue.nodes)) {
+        issue.nodes.forEach(node => {
+            if (node.fixes && Array.isArray(node.fixes)) {
+                node.fixes.forEach(fix => {
+                    if (fix.message) {
+                        allFixes.add(fix.message);
+                    }
+                });
+            }
+        });
+    }
+
+    // Build fixes HTML if we have any
+    const fixesHtml = allFixes.size > 0 ? `
+        <div class="axe-fix-suggestions">
+            <strong>💡 Axe Suggestions:</strong>
+            <ul>
+                ${Array.from(allFixes).map(fix => `<li>${fix}</li>`).join('')}
+            </ul>
+        </div>
+    ` : '';
+
     row.innerHTML = `
         <td class="severity-cell">
             <span class="severity-badge ${issue.impact || 'moderate'}">
@@ -597,6 +690,7 @@ function createIssueTableRow(issue, type = 'violation') {
         </td>
         <td class="description-cell">
             ${issue.description}
+            ${fixesHtml}
         </td>
         <td class="wcag-cell">
             ${tags.map(tag => `<span class="wcag-tag">${tag}</span>`).join(' ')}
@@ -683,11 +777,20 @@ async function runAiEnhancement() {
         console.log('📸 Capturing screenshot for Gemini...');
         const imageBase64 = await capturePreview(previewContainer);
 
-        // Build issues list for Gemini
+        // Build issues list for Gemini with complete context
         const issuesForAi = axeResults.violations.map(v => ({
             type: v.id,
             description: v.description,
-            impact: v.impact
+            impact: v.impact,
+            help: v.help,
+            helpUrl: v.helpUrl,
+            nodes: v.nodes.map(node => ({
+                html: node.html,
+                target: node.target.join(', '),
+                failureSummary: node.failureSummary,
+                axeFixes: node.fixes.map(f => f.message).join('; ')
+            })),
+            wcagTags: formatWcagTags(v.tags)
         }));
 
         console.log('🤖 Sending to Gemini API...');
@@ -776,6 +879,9 @@ function setupTextToSpeech() {
     ttsModeSelect.addEventListener('change', (e) => {
         ttsMode = e.target.value;
         console.log(`🔊 TTS mode changed to: ${ttsMode}`);
+
+        // Update data attribute for mode-specific styling
+        document.querySelector('.tts-controls').dataset.mode = ttsMode;
 
         // Stop any ongoing narration when mode changes
         if (ttsPlaying) {

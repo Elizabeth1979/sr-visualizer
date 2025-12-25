@@ -75,18 +75,21 @@
                 <div class="viz-header">
                     <h2>Visualization</h2>
                     <div class="controls">
-                        <button class="btn btn-icon" id="prev-btn" title="Previous element">◀</button>
-                        <span class="element-counter" id="element-counter">0 / 0</span>
-                        <button class="btn btn-icon" id="next-btn" title="Next element">▶</button>
-                        <div class="tts-controls">
+                        <button class="btn btn-icon" id="prev-btn" title="Previous element" aria-label="Previous element">◀</button>
+                        <span class="element-counter" id="element-counter" aria-live="polite" aria-atomic="true">0 / 0</span>
+                        <button class="btn btn-icon" id="next-btn" title="Next element" aria-label="Next element">▶</button>
+                        <div class="tts-controls" data-mode="single">
                             <select id="tts-mode-select" class="tts-mode-select" title="Choose reading mode">
                                 <option value="single">Read Current</option>
                                 <option value="continuous">Read All</option>
                             </select>
-                            <button class="btn btn-icon" id="tts-toggle-btn" title="Play/Pause narration">🔊</button>
+                            <button class="btn btn-icon" id="tts-toggle-btn" title="Play/Pause narration" aria-label="Play or pause text to speech narration">🔊</button>
                         </div>
                     </div>
                 </div>
+
+                <!-- Status announcements for screen readers -->
+                <div class="sr-only" id="sr-status" aria-live="polite" aria-atomic="true"></div>
 
                 <!-- Side-by-side Preview and SR Output -->
                 <div class="viz-split-container">
@@ -101,7 +104,7 @@
                     <div class="sr-output-panel">
                         <div class="sr-output-header">
                             <h3>🔊 Screen Reader Output</h3>
-                            <span class="tts-indicator" id="tts-indicator" style="display: none;">Speaking...</span>
+                            <span class="tts-indicator" id="tts-indicator" style="display: none;" aria-live="polite" aria-atomic="true">Speaking...</span>
                         </div>
                         <ul id="announcement-list" class="announcement-list">
                             <li class="placeholder-item">Announcements will appear here...</li>
@@ -238,7 +241,7 @@
         <div class="modal-container">
             <div class="modal-header">
                 <h2 id="modal-title">🤖 Connect Gemini AI</h2>
-                <button class="modal-close" id="modal-close-btn" aria-label="Close modal">✕</button>
+                <button class="modal-close" id="modal-close-btn" aria-label="Close dialog">✕</button>
             </div>
             <div class="modal-body">
                 <p class="modal-description">Enter your Gemini API key to enable AI-powered accessibility suggestions.

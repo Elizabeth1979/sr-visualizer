@@ -117,7 +117,8 @@ export async function analyzeContainer(container, onProgress = null) {
  * This provides results even if VSR fails
  */
 export function analyzeContainerSimple(container) {
-    const results = [];
+    // Collect all elements with their metadata first
+    const elementsWithData = [];
 
     // Scan for key elements
     const selectors = [
@@ -177,18 +178,40 @@ export function analyzeContainerSimple(container) {
         },
     ];
 
-    let index = 0;
+    // Collect all matching elements
     selectors.forEach(({ selector, category, label, labelFn }) => {
         container.querySelectorAll(selector).forEach(el => {
             const announcement = labelFn ? labelFn(el) : label;
-            results.push({
-                index: index++,
+            elementsWithData.push({
                 announcement,
                 category,
                 element: el
             });
         });
     });
+
+    // Sort elements by their DOM position (reading order)
+    elementsWithData.sort((a, b) => {
+        const position = a.element.compareDocumentPosition(b.element);
+
+        // If b comes before a in document order
+        if (position & Node.DOCUMENT_POSITION_FOLLOWING) {
+            return -1;
+        }
+        // If a comes before b in document order
+        if (position & Node.DOCUMENT_POSITION_PRECEDING) {
+            return 1;
+        }
+        return 0;
+    });
+
+    // Now assign indices in the correct reading order
+    const results = elementsWithData.map((item, index) => ({
+        index,
+        announcement: item.announcement,
+        category: item.category,
+        element: item.element
+    }));
 
     return results;
 }

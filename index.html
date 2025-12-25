@@ -22,54 +22,54 @@
                 <h1>SR Visualizer</h1>
             </div>
             <p class="tagline">See what screen readers announce</p>
+            <button class="btn btn-secondary" id="new-analysis-btn" style="display: none;">
+                ← New Analysis
+            </button>
         </header>
 
-        <!-- Main Content -->
-        <main class="main">
-            <!-- Input Section -->
-            <section class="input-section" id="input-section">
-                <div class="input-section-header">
-                    <h2>HTML Input</h2>
-                    <button class="btn btn-icon collapse-toggle" id="collapse-toggle" title="Toggle panel">
-                        <span class="collapse-icon">◀</span>
-                    </button>
+        <!-- Start Screen (shown initially) -->
+        <div class="start-screen" id="start-screen">
+            <div class="start-screen-content">
+                <h2>Get Started</h2>
+                <p class="start-screen-description">Choose a sample page or paste your own HTML to analyze</p>
+
+                <div class="tabs">
+                    <button class="tab active" data-tab="samples">Sample Pages</button>
+                    <button class="tab" data-tab="paste">Paste HTML/DOM</button>
                 </div>
-                <div class="input-section-content" id="input-section-content">
-                    <div class="tabs">
-                        <button class="tab active" data-tab="samples">Sample Pages</button>
-                        <button class="tab" data-tab="paste">Paste HTML/DOM</button>
-                    </div>
 
-                    <!-- Sample Pages Tab -->
-                    <div class="tab-content active" id="samples-tab">
-                        <div class="sample-grid">
-                            <button class="sample-card" data-sample="good">
-                                <span class="sample-icon">✅</span>
-                                <span class="sample-title">Accessible Page</span>
-                                <span class="sample-desc">Proper labels, headings, landmarks</span>
-                            </button>
-                            <button class="sample-card" data-sample="bad">
-                                <span class="sample-icon">❌</span>
-                                <span class="sample-title">Problematic Page</span>
-                                <span class="sample-desc">Missing labels, no alt text</span>
-                            </button>
-                            <button class="sample-card" data-sample="form">
-                                <span class="sample-icon">📝</span>
-                                <span class="sample-title">Form Example</span>
-                                <span class="sample-desc">Labels, inputs, validation</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Paste HTML Tab -->
-                    <div class="tab-content" id="paste-tab">
-                        <textarea id="html-input" placeholder="Paste your HTML or DOM here..."></textarea>
-                        <button class="btn btn-primary" id="analyze-btn">Analyze</button>
-                        <p class="hint">Tip: In DevTools, right-click an element → Copy → Copy outerHTML</p>
+                <!-- Sample Pages Tab -->
+                <div class="tab-content active" id="samples-tab">
+                    <div class="sample-grid">
+                        <button class="sample-card" data-sample="good">
+                            <span class="sample-icon">✅</span>
+                            <span class="sample-title">Accessible Page</span>
+                            <span class="sample-desc">Proper labels, headings, landmarks</span>
+                        </button>
+                        <button class="sample-card" data-sample="bad">
+                            <span class="sample-icon">❌</span>
+                            <span class="sample-title">Problematic Page</span>
+                            <span class="sample-desc">Missing labels, no alt text</span>
+                        </button>
+                        <button class="sample-card" data-sample="form">
+                            <span class="sample-icon">📝</span>
+                            <span class="sample-title">Form Example</span>
+                            <span class="sample-desc">Labels, inputs, validation</span>
+                        </button>
                     </div>
                 </div>
-            </section>
 
+                <!-- Paste HTML Tab -->
+                <div class="tab-content" id="paste-tab">
+                    <textarea id="html-input" placeholder="Paste your HTML or DOM here..."></textarea>
+                    <button class="btn btn-primary" id="analyze-btn">Analyze</button>
+                    <p class="hint">Tip: In DevTools, right-click an element → Copy → Copy outerHTML</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content (hidden initially) -->
+        <main class="main" id="main-content" style="display: none;">
             <!-- Visualization Section -->
             <section class="visualization-section">
                 <div class="viz-header">
@@ -78,6 +78,13 @@
                         <button class="btn btn-icon" id="prev-btn" title="Previous element">◀</button>
                         <span class="element-counter" id="element-counter">0 / 0</span>
                         <button class="btn btn-icon" id="next-btn" title="Next element">▶</button>
+                        <div class="tts-controls">
+                            <select id="tts-mode-select" class="tts-mode-select" title="Choose reading mode">
+                                <option value="single">Read Current</option>
+                                <option value="continuous">Read All</option>
+                            </select>
+                            <button class="btn btn-icon" id="tts-toggle-btn" title="Play/Pause narration">🔊</button>
+                        </div>
                     </div>
                 </div>
 
@@ -90,29 +97,47 @@
                         </div>
                     </div>
 
-                    <!-- Output Panel - Split into SR and Issues -->
-                    <div class="output-panel">
-                        <!-- Screen Reader Announcements -->
-                        <div class="announcement-log">
+                    <!-- Screen Reader Output -->
+                    <div class="sr-output-panel">
+                        <div class="sr-output-header">
                             <h3>🔊 Screen Reader Output</h3>
-                            <ul id="announcement-list" class="announcement-list">
-                                <li class="placeholder-item">Announcements will appear here...</li>
-                            </ul>
+                            <span class="tts-indicator" id="tts-indicator" style="display: none;">Speaking...</span>
                         </div>
-
-                        <!-- Accessibility Issues -->
-                        <div class="issues-section" id="issues-section">
-                            <div class="issues-header">
-                                <h3>⚠️ Accessibility Issues</h3>
-                                <button class="btn btn-sm btn-ai" id="enhance-ai-btn" title="Enhance with AI">
-                                    🤖 Enhance with AI
-                                </button>
-                            </div>
-                            <div class="issues-content" id="issues-content">
-                                <p class="placeholder-item">Issues will appear after analysis...</p>
-                            </div>
-                        </div>
+                        <ul id="announcement-list" class="announcement-list">
+                            <li class="placeholder-item">Announcements will appear here...</li>
+                        </ul>
                     </div>
+                </div>
+
+                <!-- Accessibility Issues Section -->
+                <div class="issues-section-standalone" id="issues-section">
+                    <div class="issues-header">
+                        <h3>⚠️ Accessibility Issues</h3>
+                        <button class="btn btn-sm btn-secondary" id="clear-api-key-btn" title="Clear stored API key"
+                            style="display: none;">
+                            🔑 Clear Key
+                        </button>
+                    </div>
+                    <div class="issues-content" id="issues-content">
+                        <p class="placeholder-item">Issues will appear after analysis...</p>
+                    </div>
+                </div>
+
+                <!-- AI Enhancements Section -->
+                <div class="ai-section-standalone" id="ai-section" style="display: none;">
+                    <div class="ai-section-header">
+                        <h3>🤖 AI-Powered Suggestions</h3>
+                    </div>
+                    <div class="ai-section-content" id="ai-section-content">
+                        <p class="placeholder-item">AI suggestions will appear here...</p>
+                    </div>
+                </div>
+
+                <!-- AI Enhancement Button -->
+                <div class="ai-enhance-container">
+                    <button class="btn btn-ai" id="enhance-ai-btn" title="Analyze a page first" disabled>
+                        🤖 Enhance with AI
+                    </button>
                 </div>
             </section>
         </main>
@@ -207,6 +232,34 @@
             </form>
         </main>
     </template>
+
+    <!-- API Key Modal -->
+    <div class="modal-backdrop" id="api-key-modal" role="dialog" aria-labelledby="modal-title" aria-modal="true">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 id="modal-title">🤖 Connect Gemini AI</h2>
+                <button class="modal-close" id="modal-close-btn" aria-label="Close modal">✕</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-description">Enter your Gemini API key to enable AI-powered accessibility suggestions.
+                </p>
+                <div id="modal-error" class="modal-error" style="display: none;"></div>
+                <div class="modal-input-group">
+                    <label for="modal-api-key-input">API Key</label>
+                    <input type="password" id="modal-api-key-input" placeholder="Enter your Gemini API key"
+                        autocomplete="off">
+                </div>
+                <p class="modal-hint">
+                    Get a free API key at <a href="https://aistudio.google.com/apikey" target="_blank"
+                        rel="noopener">aistudio.google.com/apikey</a>
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
+                <button class="btn btn-ai" id="modal-save-btn">Connect & Analyze</button>
+            </div>
+        </div>
+    </div>
 
     <script type="module" src="app.js"></script>
 </body>

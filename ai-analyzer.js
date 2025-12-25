@@ -96,7 +96,7 @@ Respond as a JSON object with this structure:
     console.log('📸 Image data length:', imageBase64.length);
 
     const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro:generateContent?key=${key}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${key}`,
         {
             method: 'POST',
             headers: {

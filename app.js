@@ -40,9 +40,28 @@ const nextBtn = document.getElementById('next-btn');
 const elementCounter = document.getElementById('element-counter');
 const issuesContent = document.getElementById('issues-content');
 const enhanceAiBtn = document.getElementById('enhance-ai-btn');
-const inputSection = document.getElementById('input-section');
-const collapseToggle = document.getElementById('collapse-toggle');
-const mainContainer = document.querySelector('.main');
+const apiKeyModal = document.getElementById('api-key-modal');
+const startScreen = document.getElementById('start-screen');
+const mainContent = document.getElementById('main-content');
+const newAnalysisBtn = document.getElementById('new-analysis-btn');
+const modalApiKeyInput = document.getElementById('modal-api-key-input');
+const modalSaveBtn = document.getElementById('modal-save-btn');
+const modalCancelBtn = document.getElementById('modal-cancel-btn');
+const modalCloseBtn = document.getElementById('modal-close-btn');
+const modalError = document.getElementById('modal-error');
+const clearApiKeyBtn = document.getElementById('clear-api-key-btn');
+const ttsToggleBtn = document.getElementById('tts-toggle-btn');
+const ttsIndicator = document.getElementById('tts-indicator');
+const aiSection = document.getElementById('ai-section');
+const aiSectionContent = document.getElementById('ai-section-content');
+const ttsModeSelect = document.getElementById('tts-mode-select');
+
+// Text-to-Speech State
+let ttsEnabled = false;
+let ttsPlaying = false;
+let ttsMode = 'single'; // 'single' or 'continuous'
+let currentUtterance = null;
+let currentHighlight = null;
 
 /**
  * Initialize the application
@@ -53,18 +72,53 @@ function init() {
     setupAnalyzeButton();
     setupNavigation();
     setupAiEnhanceButton();
-    setupCollapseToggle();
-    console.log('🚀 SR Visualizer initialized');
+    setupModal();
+    setupClearApiKeyButton();
+    updateClearKeyButtonVisibility();
+    setupTextToSpeech();
+    setupNewAnalysisButton();
+
+    console.log('✅ SR Visualizer initialized');
 }
 
 /**
- * Setup collapse/expand toggle for input panel
+ * Setup New Analysis button
  */
-function setupCollapseToggle() {
-    collapseToggle.addEventListener('click', () => {
-        inputSection.classList.toggle('collapsed');
-        mainContainer.classList.toggle('input-collapsed');
-    });
+function setupNewAnalysisButton() {
+    newAnalysisBtn.addEventListener('click', showStartScreen);
+}
+
+/**
+ * Show start screen and hide visualization
+ */
+function showStartScreen() {
+    startScreen.style.display = 'block';
+    mainContent.style.display = 'none';
+    newAnalysisBtn.style.display = 'none';
+
+    // Clear previous analysis
+    analysisResults = [];
+    currentIndex = 0;
+    axeResults = null;
+    previewFrame.innerHTML = '<p class="placeholder-text">Select a sample or paste HTML to begin</p>';
+    announcementList.innerHTML = '<li class="placeholder-item">Announcements will appear here...</li>';
+    issuesContent.innerHTML = '<p class="placeholder-item">Issues will appear after analysis...</p>';
+    aiSection.style.display = 'none';
+    elementCounter.textContent = '0 / 0';
+
+    // Stop any ongoing narration
+    if (typeof stopNarration === 'function') {
+        stopNarration();
+    }
+}
+
+/**
+ * Show visualization and hide start screen
+ */
+function showVisualization() {
+    startScreen.style.display = 'none';
+    mainContent.style.display = 'block';
+    newAnalysisBtn.style.display = 'block';
 }
 
 /**
@@ -148,13 +202,151 @@ function setupAiEnhanceButton() {
 }
 
 /**
+ * Setup modal event handlers
+ */
+function setupModal() {
+    // Close modal on backdrop click
+    apiKeyModal.addEventListener('click', (e) => {
+        if (e.target === apiKeyModal) {
+            closeApiKeyModal();
+        }
+    });
+
+    // Close modal on close button
+    modalCloseBtn.addEventListener('click', closeApiKeyModal);
+    modalCancelBtn.addEventListener('click', closeApiKeyModal);
+
+    // Close modal on ESC key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && apiKeyModal.classList.contains('open')) {
+            closeApiKeyModal();
+        }
+    });
+
+    // Save API key on button click
+    modalSaveBtn.addEventListener('click', async () => {
+        await validateAndSaveApiKey();
+    });
+
+    // Save API key on Enter key
+    modalApiKeyInput.addEventListener('keypress', async (e) => {
+        if (e.key === 'Enter') {
+            await validateAndSaveApiKey();
+        }
+    });
+}
+
+/**
+ * Open the API key modal
+ */
+function openApiKeyModal(errorMessage = null) {
+    apiKeyModal.classList.add('open');
+    modalApiKeyInput.value = '';
+    modalApiKeyInput.focus();
+
+    // Show error message if provided
+    if (errorMessage) {
+        modalError.textContent = errorMessage;
+        modalError.style.display = 'block';
+    } else {
+        modalError.style.display = 'none';
+    }
+}
+
+/**
+ * Close the API key modal
+ */
+function closeApiKeyModal() {
+    apiKeyModal.classList.remove('open');
+    modalApiKeyInput.value = '';
+    modalError.style.display = 'none';
+    modalSaveBtn.disabled = false;
+    modalSaveBtn.textContent = 'Connect & Analyze';
+}
+
+/**
+ * Validate and save API key from modal
+ */
+async function validateAndSaveApiKey() {
+    const key = modalApiKeyInput.value.trim();
+    if (!key) return;
+
+    // Show loading state
+    modalSaveBtn.disabled = true;
+    modalSaveBtn.textContent = 'Validating...';
+    modalError.style.display = 'none';
+
+    try {
+        // Temporarily set the key for validation
+        setApiKey(key);
+
+        // Validate the API key
+        console.log('🔑 Validating API key in modal...');
+        const { testApiConnection } = await import('./ai-analyzer.js');
+        await testApiConnection();
+
+        console.log('✅ API key is valid');
+
+        // Close modal and run analysis
+        closeApiKeyModal();
+        updateClearKeyButtonVisibility();
+        await runAiEnhancement();
+
+    } catch (error) {
+        console.error('❌ API key validation failed:', error);
+
+        // Clear the invalid key
+        clearApiKey();
+
+        // Show error in modal
+        modalError.textContent = '⚠️ Invalid API key. Please check and try again.';
+        modalError.style.display = 'block';
+
+        // Reset button state
+        modalSaveBtn.disabled = false;
+        modalSaveBtn.textContent = 'Connect & Analyze';
+    }
+}
+
+/**
+ * Setup Clear API Key button
+ */
+function setupClearApiKeyButton() {
+    clearApiKeyBtn.addEventListener('click', () => {
+        if (confirm('Are you sure you want to clear your stored API key?')) {
+            clearApiKey();
+            updateClearKeyButtonVisibility();
+            alert('API key cleared successfully!');
+        }
+    });
+}
+
+/**
+ * Update Clear Key button visibility based on whether a key is stored
+ */
+function updateClearKeyButtonVisibility() {
+    if (hasApiKey()) {
+        clearApiKeyBtn.style.display = 'block';
+    } else {
+        clearApiKeyBtn.style.display = 'none';
+    }
+}
+
+/**
  * Load HTML into preview and run analysis
  */
 async function loadAndAnalyze(html) {
+    // Switch to visualization view
+    showVisualization();
+
     // Clear previous state
     analysisResults = [];
     currentIndex = 0;
     axeResults = null;
+
+    // Disable AI Enhance button during analysis
+    enhanceAiBtn.disabled = true;
+    enhanceAiBtn.title = 'Please wait for analysis to complete';
 
     // Create preview content
     previewFrame.innerHTML = html;
@@ -216,9 +408,17 @@ async function loadAndAnalyze(html) {
     try {
         axeResults = await runAxeAnalysis(previewFrame);
         renderAxeResults(axeResults);
+
+        // Enable AI Enhance button after analysis completes
+        enhanceAiBtn.disabled = false;
+        enhanceAiBtn.title = 'Enhance with AI';
     } catch (error) {
         console.error('❌ Axe analysis failed:', error);
         issuesContent.innerHTML = `<p class="error" style="color: var(--accent-red);">Axe analysis failed: ${error.message}</p>`;
+
+        // Enable AI Enhance button even if axe analysis fails
+        enhanceAiBtn.disabled = false;
+        enhanceAiBtn.title = 'Enhance with AI';
     }
 }
 
@@ -227,7 +427,8 @@ async function loadAndAnalyze(html) {
  */
 function addAnnouncementToList(result) {
     const li = document.createElement('li');
-    li.innerHTML = `<span class="category-dot ${result.category}"></span> ${result.announcement}`;
+    const colorIndex = result.index % 20; // Cycle through 20 colors
+    li.innerHTML = `<span class="category-dot color-${colorIndex}"></span> ${result.announcement}`;
     li.dataset.index = result.index;
     li.addEventListener('click', () => {
         currentIndex = result.index;
@@ -238,6 +439,7 @@ function addAnnouncementToList(result) {
     // Auto-scroll to show new item
     li.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
+
 
 /**
  * Update the announcement list with all results
@@ -252,7 +454,8 @@ function updateAnnouncementList() {
 
     analysisResults.forEach((result, index) => {
         const li = document.createElement('li');
-        li.innerHTML = `<span class="category-dot ${result.category}"></span> ${result.announcement}`;
+        const colorIndex = index % 20; // Cycle through 20 colors
+        li.innerHTML = `<span class="category-dot color-${colorIndex}"></span> ${result.announcement}`;
         li.dataset.index = index;
         li.addEventListener('click', () => {
             currentIndex = index;
@@ -262,10 +465,15 @@ function updateAnnouncementList() {
     });
 }
 
+
 /**
  * Update the currently highlighted element
  */
 function updateCurrentElement() {
+    if (analysisResults.length === 0) return;
+
+    const currentResult = analysisResults[currentIndex];
+
     // Update announcement list highlighting
     announcementList.querySelectorAll('li').forEach((li, index) => {
         li.classList.toggle('active', index === currentIndex);
@@ -273,6 +481,9 @@ function updateCurrentElement() {
             li.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     });
+
+    // Highlight element in preview
+    highlightElementInPreview(currentResult.element);
 
     // Update counter
     updateCounter();
@@ -320,24 +531,84 @@ function renderAxeResults(results) {
     `;
     issuesContent.appendChild(summary);
 
-    // Violations
+    // Create table
+    const table = document.createElement('table');
+    table.className = 'issues-table';
+
+    // Table header
+    const thead = document.createElement('thead');
+    thead.innerHTML = `
+        <tr>
+            <th scope="col">Severity</th>
+            <th scope="col">Issue</th>
+            <th scope="col">Description</th>
+            <th scope="col">WCAG</th>
+            <th scope="col">Info</th>
+        </tr>
+    `;
+    table.appendChild(thead);
+
+    // Table body
+    const tbody = document.createElement('tbody');
+
+    // Add violations
     violations.forEach(violation => {
-        const card = createAxeIssueCard(violation, 'violation');
-        issuesContent.appendChild(card);
+        const row = createIssueTableRow(violation, 'violation');
+        tbody.appendChild(row);
     });
 
-    // Incomplete (needs review)
-    if (incomplete.length > 0) {
-        const reviewHeader = document.createElement('p');
-        reviewHeader.style.cssText = 'margin: 12px 0 8px; font-size: 0.8rem; color: var(--text-muted);';
-        reviewHeader.textContent = '⚠️ Needs manual review:';
-        issuesContent.appendChild(reviewHeader);
+    // Add incomplete issues
+    incomplete.forEach(issue => {
+        const row = createIssueTableRow(issue, 'incomplete');
+        tbody.appendChild(row);
+    });
 
-        incomplete.forEach(issue => {
-            const card = createAxeIssueCard(issue, 'incomplete');
-            issuesContent.appendChild(card);
-        });
-    }
+    table.appendChild(tbody);
+    issuesContent.appendChild(table);
+}
+
+/**
+ * Create a table row for an accessibility issue
+ */
+function createIssueTableRow(issue, type = 'violation') {
+    const row = document.createElement('tr');
+    row.className = `issue-row ${issue.impact || 'moderate'}`;
+    row.dataset.issueId = issue.id;
+
+    const tags = formatWcagTags(issue.tags);
+    const icon = getImpactIcon(issue.impact);
+
+    // Severity text (not just color)
+    const severityText = {
+        'critical': 'CRITICAL',
+        'serious': 'SERIOUS',
+        'moderate': 'MODERATE',
+        'minor': 'MINOR'
+    }[issue.impact] || 'UNKNOWN';
+
+    row.innerHTML = `
+        <td class="severity-cell">
+            <span class="severity-badge ${issue.impact || 'moderate'}">
+                ${icon} ${severityText}
+            </span>
+        </td>
+        <td class="issue-title-cell">
+            <strong>${issue.help}</strong>
+        </td>
+        <td class="description-cell">
+            ${issue.description}
+        </td>
+        <td class="wcag-cell">
+            ${tags.map(tag => `<span class="wcag-tag">${tag}</span>`).join(' ')}
+        </td>
+        <td class="info-cell">
+            <a href="${issue.helpUrl}" target="_blank" rel="noopener" class="learn-more-link">
+                Learn more →
+            </a>
+        </td>
+    `;
+
+    return row;
 }
 
 /**
@@ -384,7 +655,23 @@ async function runAiEnhancement() {
 
     // Check for API key
     if (!hasApiKey()) {
-        showApiKeyPrompt();
+        openApiKeyModal();
+        return;
+    }
+
+    // Validate stored API key before using it
+    enhanceAiBtn.disabled = true;
+    enhanceAiBtn.innerHTML = '⏳ Validating...';
+
+    try {
+        const { testApiConnection } = await import('./ai-analyzer.js');
+        await testApiConnection();
+    } catch (error) {
+        console.error('❌ Stored API key is invalid:', error);
+        clearApiKey();
+        enhanceAiBtn.disabled = false;
+        enhanceAiBtn.innerHTML = '🤖 AI Enhance';
+        openApiKeyModal('⚠️ Your stored API key is invalid. Please enter a new one.');
         return;
     }
 
@@ -416,6 +703,14 @@ async function runAiEnhancement() {
     } catch (error) {
         console.error('❌ AI enhancement failed:', error);
 
+        // If API key is invalid, clear it and prompt again with modal
+        if (error.message.includes('API key not valid') || error.message.includes('400') || error.message.includes('403')) {
+            clearApiKey();
+            openApiKeyModal('⚠️ The API key you entered is invalid. Please check and try again.');
+            enhanceAiBtn.innerHTML = '🤖 AI Enhance';
+            return;
+        }
+
         const errorMsg = document.createElement('div');
         errorMsg.style.cssText = 'margin-top: 12px; padding: 8px 12px; background: rgba(239,68,68,0.1); border-radius: 6px; border-left: 2px solid var(--accent-red);';
         errorMsg.innerHTML = `<p style="margin: 0; color: var(--accent-red); font-size: 0.8rem;">⚠️ AI enhancement failed: ${error.message}</p>`;
@@ -427,83 +722,329 @@ async function runAiEnhancement() {
     }
 }
 
-/**
- * Show API key prompt in issues panel
- */
-function showApiKeyPrompt() {
-    const promptDiv = document.createElement('div');
-    promptDiv.className = 'ai-key-prompt';
-    promptDiv.style.cssText = 'margin-top: 12px; padding: 12px; background: linear-gradient(135deg, rgba(168,85,247,0.1), rgba(59,130,246,0.1)); border-radius: 8px; border: 1px solid rgba(168,85,247,0.2);';
-    promptDiv.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-            <span>🤖</span>
-            <strong style="font-size: 0.85rem;">Enter Gemini API Key</strong>
-        </div>
-        <div style="display: flex; gap: 8px;">
-            <input type="password" id="inline-api-key" placeholder="API Key" 
-                style="flex: 1; padding: 6px 10px; background: var(--bg-tertiary); border: 1px solid var(--bg-elevated); border-radius: 4px; color: var(--text-primary); font-size: 0.85rem;">
-            <button id="inline-save-key" class="btn btn-sm btn-ai">Connect</button>
-        </div>
-        <p style="color: var(--text-muted); font-size: 0.7rem; margin: 6px 0 0;">
-            Get a key at <a href="https://aistudio.google.com/apikey" target="_blank" style="color: var(--accent-blue);">aistudio.google.com/apikey</a>
-        </p>
-    `;
 
-    // Remove existing prompt if any
-    const existingPrompt = issuesContent.querySelector('.ai-key-prompt');
-    if (existingPrompt) existingPrompt.remove();
-
-    issuesContent.appendChild(promptDiv);
-
-    // Handle save
-    document.getElementById('inline-save-key').addEventListener('click', async () => {
-        const key = document.getElementById('inline-api-key').value.trim();
-        if (key) {
-            setApiKey(key);
-            promptDiv.remove();
-            await runAiEnhancement();
-        }
-    });
-}
 
 /**
- * Render AI suggestions on existing issue cards
+ * Render AI suggestions in the standalone AI section
  */
 function renderAiSuggestions(aiAnalysis) {
     if (!aiAnalysis?.issues) return;
 
-    // Add overall summary
+    // Show AI section
+    aiSection.style.display = 'block';
+
+    // Clear previous content
+    aiSectionContent.innerHTML = '';
+
+    // Add overall summary if available
     if (aiAnalysis.summary) {
-        const summaryEl = document.querySelector('.issues-summary');
-        if (summaryEl) {
-            const aiSummary = document.createElement('div');
-            aiSummary.style.cssText = 'margin-top: 12px; padding: 10px; background: linear-gradient(135deg, rgba(168,85,247,0.1), rgba(59,130,246,0.1)); border-radius: 6px; font-size: 0.8rem;';
-            aiSummary.innerHTML = `<strong>🤖 AI Summary:</strong> ${aiAnalysis.summary}`;
-            summaryEl.after(aiSummary);
-        }
+        const summaryDiv = document.createElement('div');
+        summaryDiv.style.cssText = 'padding: var(--space-md); background: rgba(255, 214, 10, 0.1); border-radius: var(--radius-sm); margin-bottom: var(--space-md); border-left: 3px solid var(--accent-yellow);';
+        summaryDiv.innerHTML = `<strong>📊 Overall Assessment:</strong> ${aiAnalysis.summary}`;
+        aiSectionContent.appendChild(summaryDiv);
     }
 
-    // Add suggestions to each issue card
+    // Render each AI suggestion
     aiAnalysis.issues.forEach((aiIssue, index) => {
-        const cards = issuesContent.querySelectorAll('.axe-issue');
-        const card = cards[index];
-        if (!card) return;
+        const suggestionCard = document.createElement('div');
+        suggestionCard.className = 'ai-suggestion-card';
+        suggestionCard.style.cssText = 'background: var(--bg-elevated); padding: var(--space-md) var(--space-lg); border-radius: var(--radius-md); border-left: 3px solid var(--accent-purple);';
 
-        // Remove existing AI suggestion if any
-        const existingSuggestion = card.querySelector('.ai-suggestion');
-        if (existingSuggestion) existingSuggestion.remove();
-
-        const suggestionDiv = document.createElement('div');
-        suggestionDiv.className = 'ai-suggestion';
-        suggestionDiv.innerHTML = `
-            <div class="ai-suggestion-header">🤖 AI Suggestion</div>
-            <p class="ai-suggestion-text">${aiIssue.aiSuggestion}</p>
-            ${aiIssue.explanation ? `<p style="margin-top: 4px; font-size: 0.75rem; color: var(--text-secondary);">${aiIssue.explanation}</p>` : ''}
+        suggestionCard.innerHTML = `
+            <div style="font-weight: 600; margin-bottom: var(--space-xs); color: var(--text-primary);">Issue ${index + 1}: ${aiIssue.type || 'Accessibility Issue'}</div>
+            <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: var(--space-sm);">${aiIssue.aiSuggestion}</div>
+            ${aiIssue.explanation ? `<div style="font-size: 0.85rem; color: var(--text-muted); padding-top: var(--space-xs); border-top: 1px solid var(--bg-tertiary);">${aiIssue.explanation}</div>` : ''}
         `;
-        card.appendChild(suggestionDiv);
+
+        aiSectionContent.appendChild(suggestionCard);
     });
 }
 
+/**
+ * Setup Text-to-Speech functionality
+ */
+function setupTextToSpeech() {
+    // Check if browser supports speech synthesis
+    if (!('speechSynthesis' in window)) {
+        console.warn('⚠️ Text-to-speech not supported in this browser');
+        ttsToggleBtn.disabled = true;
+        ttsToggleBtn.title = 'Text-to-speech not supported';
+        return;
+    }
+
+    // Handle mode selection
+    ttsModeSelect.addEventListener('change', (e) => {
+        ttsMode = e.target.value;
+        console.log(`🔊 TTS mode changed to: ${ttsMode}`);
+
+        // Stop any ongoing narration when mode changes
+        if (ttsPlaying) {
+            stopNarration();
+        }
+
+        // Update button title based on mode
+        updateTtsButtonTitle();
+    });
+
+    // Handle TTS button click
+    ttsToggleBtn.addEventListener('click', () => {
+        if (analysisResults.length === 0) {
+            console.log('🔊 No announcements to narrate');
+            return;
+        }
+
+        if (ttsMode === 'single') {
+            // Single mode: speak current announcement only
+            speakSingleAnnouncement();
+        } else {
+            // Continuous mode: play/pause continuous narration
+            if (ttsPlaying) {
+                stopNarration();
+            } else {
+                startNarration();
+            }
+        }
+    });
+
+    // Set initial button title
+    updateTtsButtonTitle();
+}
+
+/**
+ * Update TTS button title based on current mode
+ */
+function updateTtsButtonTitle() {
+    if (ttsMode === 'single') {
+        ttsToggleBtn.title = 'Read current announcement';
+    } else {
+        ttsToggleBtn.title = ttsPlaying ? 'Pause narration' : 'Play continuous narration';
+    }
+}
+
+/**
+ * Speak only the current announcement (single mode)
+ */
+function speakSingleAnnouncement() {
+    if (currentIndex < 0 || currentIndex >= analysisResults.length) return;
+
+    const currentResult = analysisResults[currentIndex];
+    if (!currentResult || !currentResult.announcement) return;
+
+    // Stop any ongoing speech
+    if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+    }
+
+    // Show indicator
+    ttsIndicator.style.display = 'inline';
+    ttsIndicator.textContent = 'Speaking...';
+    ttsToggleBtn.classList.add('speaking');
+
+    // Create and speak utterance
+    currentUtterance = new SpeechSynthesisUtterance(currentResult.announcement);
+    currentUtterance.rate = 1.0;
+    currentUtterance.pitch = 1.0;
+    currentUtterance.volume = 1.0;
+
+    currentUtterance.onend = () => {
+        ttsIndicator.style.display = 'none';
+        ttsToggleBtn.classList.remove('speaking');
+        currentUtterance = null;
+    };
+
+    currentUtterance.onerror = () => {
+        ttsIndicator.style.display = 'none';
+        ttsToggleBtn.classList.remove('speaking');
+        currentUtterance = null;
+    };
+
+    window.speechSynthesis.speak(currentUtterance);
+}
+
+/**
+ * Start continuous narration from current index
+ */
+function startNarration() {
+    if (analysisResults.length === 0) return;
+
+    ttsPlaying = true;
+    ttsToggleBtn.classList.add('speaking');
+    ttsIndicator.style.display = 'inline';
+    ttsIndicator.textContent = 'Playing...';
+
+    console.log('▶️ Starting narration from index', currentIndex);
+    speakCurrentAndContinue();
+}
+
+/**
+ * Stop continuous narration
+ */
+function stopNarration() {
+    ttsPlaying = false;
+    stopSpeech();
+    ttsToggleBtn.classList.remove('speaking');
+    ttsIndicator.style.display = 'none';
+
+    console.log('⏸️ Narration stopped');
+}
+
+/**
+ * Speak current announcement and continue to next
+ */
+function speakCurrentAndContinue() {
+    if (!ttsPlaying || currentIndex >= analysisResults.length) {
+        stopNarration();
+        return;
+    }
+
+    const currentResult = analysisResults[currentIndex];
+    if (!currentResult || !currentResult.announcement) {
+        // Move to next if current has no announcement
+        moveToNextAndSpeak();
+        return;
+    }
+
+    // Stop any ongoing speech
+    if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+    }
+
+    // Create new utterance
+    currentUtterance = new SpeechSynthesisUtterance(currentResult.announcement);
+
+    // Configure utterance
+    currentUtterance.rate = 1.0;
+    currentUtterance.pitch = 1.0;
+    currentUtterance.volume = 1.0;
+
+    // When this announcement finishes, move to next
+    currentUtterance.onend = () => {
+        if (ttsPlaying) {
+            moveToNextAndSpeak();
+        }
+    };
+
+    currentUtterance.onerror = (event) => {
+        console.error('TTS error:', event);
+        if (ttsPlaying) {
+            moveToNextAndSpeak();
+        }
+    };
+
+    // Speak
+    window.speechSynthesis.speak(currentUtterance);
+}
+
+/**
+ * Move to next announcement and continue speaking
+ */
+function moveToNextAndSpeak() {
+    if (!ttsPlaying) return;
+
+    if (currentIndex < analysisResults.length - 1) {
+        currentIndex++;
+        updateCurrentElement();
+        // Small delay before speaking next
+        setTimeout(() => {
+            if (ttsPlaying) {
+                speakCurrentAndContinue();
+            }
+        }, 300);
+    } else {
+        // Reached the end
+        console.log('✅ Narration complete');
+        stopNarration();
+    }
+}
+
+/**
+ * Speak text using Web Speech API
+ */
+function speakText(text) {
+    if (!ttsEnabled || !text) return;
+
+    // Stop any ongoing speech
+    stopSpeech();
+
+    // Create new utterance
+    currentUtterance = new SpeechSynthesisUtterance(text);
+
+    // Configure utterance
+    currentUtterance.rate = 1.0;
+    currentUtterance.pitch = 1.0;
+    currentUtterance.volume = 1.0;
+
+    // Show indicator when speaking
+    currentUtterance.onstart = () => {
+        ttsIndicator.style.display = 'inline';
+        ttsToggleBtn.classList.add('speaking');
+    };
+
+    // Hide indicator when done
+    currentUtterance.onend = () => {
+        ttsIndicator.style.display = 'none';
+        ttsToggleBtn.classList.remove('speaking');
+        currentUtterance = null;
+    };
+
+    currentUtterance.onerror = (event) => {
+        console.error('TTS error:', event);
+        ttsIndicator.style.display = 'none';
+        ttsToggleBtn.classList.remove('speaking');
+        currentUtterance = null;
+    };
+
+    // Speak
+    window.speechSynthesis.speak(currentUtterance);
+}
+
+/**
+ * Stop current speech
+ */
+function stopSpeech() {
+    if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+    }
+    currentUtterance = null;
+}
+
+/**
+ * Highlight element in preview
+ */
+function highlightElementInPreview(element) {
+    if (!element || !previewFrame.contains(element)) return;
+
+    // Remove previous highlight
+    if (currentHighlight) {
+        currentHighlight.remove();
+        currentHighlight = null;
+    }
+
+    // Get element position relative to preview frame
+    const previewRect = previewFrame.getBoundingClientRect();
+    const elementRect = element.getBoundingClientRect();
+
+    // Create highlight overlay
+    const highlight = document.createElement('div');
+    highlight.className = 'sr-element-highlight';
+
+    // Position the highlight
+    const top = elementRect.top - previewRect.top + previewFrame.scrollTop;
+    const left = elementRect.left - previewRect.left + previewFrame.scrollLeft;
+
+    highlight.style.top = `${top}px`;
+    highlight.style.left = `${left}px`;
+    highlight.style.width = `${elementRect.width}px`;
+    highlight.style.height = `${elementRect.height}px`;
+
+    // Add to preview
+    previewFrame.appendChild(highlight);
+    currentHighlight = highlight;
+
+    // Scroll element into view
+    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', init);
-

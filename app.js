@@ -90,8 +90,19 @@ function init() {
 
 /**
  * Announce message to screen readers via live region
- * @param {string} message - Message to announce
- * @param {boolean} assertive - Use assertive (true) or polite (false)
+ *
+ * @param {string} message - Message to announce to screen reader users
+ * @param {boolean} [assertive=false] - Use assertive (true) or polite (false) priority
+ *
+ * @description
+ * Announces dynamic status updates to screen reader users via an aria-live region.
+ * - Polite mode (default): Waits for user to finish current activity
+ * - Assertive mode: Interrupts immediately
+ * Message is automatically cleared after 1 second to allow duplicate announcements.
+ *
+ * @example
+ * announceToScreenReader('Analysis complete. Found 15 elements.');
+ * announceToScreenReader('Critical error occurred!', true);
  */
 function announceToScreenReader(message, assertive = false) {
     const statusEl = document.getElementById('sr-status');
@@ -225,7 +236,27 @@ function setupNavigation() {
 }
 
 /**
- * Setup keyboard navigation shortcuts
+ * Setup keyboard navigation shortcuts for accessibility
+ *
+ * @description
+ * Enables keyboard-only navigation throughout the application:
+ *
+ * Navigation shortcuts:
+ * - Arrow Right/Down: Next element
+ * - Arrow Left/Up: Previous element
+ * - Home: Jump to first element
+ * - End: Jump to last element
+ *
+ * TTS shortcuts:
+ * - Space/Enter: Toggle text-to-speech playback
+ * - Escape: Stop TTS immediately
+ *
+ * Help:
+ * - ?: Show keyboard shortcuts help dialog
+ *
+ * Shortcuts are disabled when:
+ * - Focus is in text input, textarea, or select
+ * - Modal dialog is open
  */
 function setupKeyboardNavigation() {
     document.addEventListener('keydown', (e) => {
@@ -419,7 +450,21 @@ function closeApiKeyModal() {
 }
 
 /**
- * Setup focus trap for modal
+ * Setup focus trap for modal dialog accessibility
+ *
+ * @description
+ * Implements a keyboard focus trap to ensure screen reader and keyboard users
+ * cannot accidentally leave the modal dialog while it's open.
+ *
+ * Behavior:
+ * - Tab from last focusable element: Cycles to first element
+ * - Shift+Tab from first element: Cycles to last element
+ * - Only traps Tab key (other navigation keys work normally)
+ *
+ * Focusable elements include: buttons, inputs, and elements with tabindex >= 0
+ * Disabled elements are automatically excluded from the trap.
+ *
+ * The handler is stored on the modal element itself and removed when modal closes.
  */
 function setupModalFocusTrap() {
     // Get all focusable elements within modal
@@ -528,7 +573,25 @@ function updateClearKeyButtonVisibility() {
 }
 
 /**
- * Load HTML into preview and run analysis
+ * Load HTML into preview and coordinate all accessibility analysis
+ *
+ * @param {string} html - HTML content to analyze
+ * @returns {Promise<void>}
+ *
+ * @description
+ * Orchestrates the complete analysis workflow:
+ * 1. Switches to visualization view
+ * 2. Runs Virtual Screen Reader analysis (streams results via callback)
+ * 3. Falls back to simple DOM analysis if VSR fails
+ * 4. Runs Axe-core WCAG analysis in parallel with display updates
+ * 5. Validates results and renders to UI
+ * 6. Enables AI enhancement button
+ * 7. Announces completion to screen readers
+ *
+ * @throws {Error} If both VSR and fallback analysis fail
+ *
+ * @example
+ * await loadAndAnalyze('<button>Click me</button>');
  */
 async function loadAndAnalyze(html) {
     // Switch to visualization view
@@ -590,14 +653,39 @@ async function loadAndAnalyze(html) {
     } catch (error) {
         console.error('❌ SR Analysis failed:', error);
 
-        // Fallback to simple analysis
-        console.log('🔄 Using fallback analysis due to error');
-        analysisResults = analyzeContainerSimple(previewFrame);
-        updateAnnouncementList();
-        updateCounter();
+        // Try fallback first
+        try {
+            console.log('🔄 Attempting fallback analysis...');
+            announceToScreenReader('Primary analysis failed. Using fallback method.');
 
-        if (analysisResults.length === 0) {
-            announcementList.innerHTML = `<li class="error">Error: ${error.message}</li>`;
+            analysisResults = analyzeContainerSimple(previewFrame);
+            updateAnnouncementList();
+            updateCounter();
+
+            // Show warning (not error) that we're using fallback
+            const warning = document.createElement('li');
+            warning.className = 'warning-item';
+            warning.innerHTML = `
+                <div class="warning-message">
+                    <div class="warning-header">
+                        <span>⚠️</span>
+                        <strong>Using Simplified Analysis</strong>
+                    </div>
+                    <p>Virtual screen reader unavailable. Results may be less comprehensive.</p>
+                </div>
+            `;
+            announcementList.insertBefore(warning, announcementList.firstChild);
+
+        } catch (fallbackError) {
+            // Both failed - show error with retry
+            console.error('❌ Fallback also failed:', fallbackError);
+            const { userMessage } = categorizeError(fallbackError);
+            const errorEl = showError('Screen Reader Analysis', userMessage, () => {
+                loadAndAnalyze(html);
+            });
+            announcementList.innerHTML = '';
+            announcementList.appendChild(errorEl);
+            announceToScreenReader('Analysis failed. Please see error message.');
         }
     }
 
@@ -619,7 +707,24 @@ async function loadAndAnalyze(html) {
         enhanceAiBtn.title = 'Enhance with AI';
     } catch (error) {
         console.error('❌ Axe analysis failed:', error);
-        issuesContent.innerHTML = `<p class="error" style="color: var(--accent-red);">Axe analysis failed: ${error.message}</p>`;
+        const { userMessage } = categorizeError(error);
+        const errorEl = showError('Accessibility Checks', userMessage, async () => {
+            // Retry Axe analysis
+            try {
+                const rawResults = await runAxeAnalysis(previewFrame);
+                axeResults = validateAxeResults(rawResults);
+                renderAxeResults(axeResults);
+                announceToScreenReader('Accessibility checks completed successfully.');
+            } catch (retryError) {
+                console.error('❌ Retry failed:', retryError);
+                const { userMessage: retryMsg } = categorizeError(retryError);
+                issuesContent.innerHTML = '';
+                issuesContent.appendChild(showError('Accessibility Checks', retryMsg));
+            }
+        });
+        issuesContent.innerHTML = '';
+        issuesContent.appendChild(errorEl);
+        announceToScreenReader('Accessibility checks failed. Please see error message.');
 
         // Enable AI Enhance button even if axe analysis fails
         enhanceAiBtn.disabled = false;
@@ -672,7 +777,18 @@ function updateAnnouncementList() {
 
 
 /**
- * Update the currently highlighted element
+ * Update the currently highlighted element and auto-play TTS
+ *
+ * @description
+ * Updates UI to reflect the currently selected element:
+ * 1. Highlights corresponding item in announcement list
+ * 2. Scrolls list item into view
+ * 3. Highlights element in preview frame with yellow overlay
+ * 4. Updates element counter (e.g., "3 / 15")
+ * 5. Auto-plays TTS announcement in single mode
+ *
+ * Called when user navigates with prev/next buttons, keyboard shortcuts,
+ * or clicks an announcement in the list.
  */
 function updateCurrentElement() {
     if (analysisResults.length === 0) return;
@@ -778,7 +894,33 @@ function renderAxeResults(results) {
 }
 
 /**
- * Create a table row for an accessibility issue
+ * Create a table row for an accessibility violation or incomplete issue
+ *
+ * @param {Object} issue - Axe violation object
+ * @param {string} issue.id - Unique violation identifier (e.g., "button-name")
+ * @param {('critical'|'serious'|'moderate'|'minor')} issue.impact - Severity level
+ * @param {string} issue.description - Human-readable description of the issue
+ * @param {string} issue.help - Short help text explaining the violation
+ * @param {string} issue.helpUrl - Link to Axe documentation for this rule
+ * @param {string[]} issue.tags - WCAG tags (e.g., ["wcag2a", "wcag21aa", "best-practice"])
+ * @param {Object[]} issue.nodes - Affected DOM nodes
+ * @param {string} issue.nodes[].html - HTML snippet of the violating element
+ * @param {string[]} issue.nodes[].target - CSS selectors to identify the element
+ * @param {Object[]} issue.nodes[].fixes - Axe's suggested fixes
+ * @param {string} issue.nodes[].fixes[].message - Fix suggestion text
+ * @param {('violation'|'incomplete')} [type='violation'] - Issue classification
+ *
+ * @returns {HTMLTableRowElement} Formatted table row element with:
+ *   - Severity badge with color coding
+ *   - Issue title and description
+ *   - Axe's built-in fix suggestions (if available)
+ *   - WCAG reference tags
+ *   - "Learn more" documentation link
+ *
+ * @description
+ * Creates a comprehensive table row displaying all relevant information about
+ * an accessibility issue. Includes Axe's automated fix suggestions inline,
+ * before AI enhancement.
  */
 function createIssueTableRow(issue, type = 'violation') {
     const row = document.createElement('tr');

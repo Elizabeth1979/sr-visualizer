@@ -21,6 +21,12 @@ import {
     analyzeIssuesWithGemini
 } from './ai-analyzer.js';
 
+import {
+    validateAxeResults,
+    showError,
+    categorizeError
+} from './utils.js';
+
 // State
 let analysisResults = [];
 let currentIndex = 0;
@@ -597,7 +603,8 @@ async function loadAndAnalyze(html) {
 
     // Run Axe-core analysis (in parallel with display updates)
     try {
-        axeResults = await runAxeAnalysis(previewFrame);
+        const rawResults = await runAxeAnalysis(previewFrame);
+        axeResults = validateAxeResults(rawResults);
         renderAxeResults(axeResults);
 
         const violationCount = axeResults.violations.length;
@@ -685,6 +692,11 @@ function updateCurrentElement() {
 
     // Update counter
     updateCounter();
+
+    // Auto-play announcement if TTS is enabled
+    if (ttsEnabled && ttsMode === 'single') {
+        speakSingleAnnouncement();
+    }
 }
 
 /**

@@ -1534,3 +1534,62 @@ kbd {
     font-size: 0.9em;
     color: var(--accent-yellow);
 }
+
+/* Error messages */
+.error-message,
+.warning-message {
+    padding: var(--space-md);
+    border-radius: var(--radius-md);
+    margin: var(--space-md) 0;
+    position: relative;
+}
+
+.error-message {
+    background: rgba(239, 68, 68, 0.1);
+    border-left: 3px solid #ef4444;
+}
+
+.warning-message {
+    background: rgba(249, 115, 22, 0.1);
+    border-left: 3px solid #f97316;
+}
+
+.error-header,
+.warning-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-xs);
+}
+
+.error-icon {
+    font-size: 1.2rem;
+}
+
+.error-detail {
+    color: var(--text-secondary);
+    margin: var(--space-xs) 0;
+    font-size: 0.9rem;
+}
+
+.error-retry-btn,
+.error-dismiss-btn {
+    margin-top: var(--space-sm);
+    margin-right: var(--space-sm);
+}
+
+.error-dismiss-btn {
+    position: absolute;
+    top: var(--space-sm);
+    right: var(--space-sm);
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: var(--space-xs);
+    font-size: 1.2rem;
+}
+
+.error-dismiss-btn:hover {
+    color: var(--text-primary);
+}

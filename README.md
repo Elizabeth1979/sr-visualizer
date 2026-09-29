@@ -1,5 +1,8 @@
 # SR Visualizer
 
+> [!IMPORTANT]
+> **Archived.** Superseded by [accessibility-evidence-engine](https://github.com/Elizabeth1979/accessibility-evidence-engine). What a screen reader announces, and where on the page, lives on there in the report's Page view: the Screen reader path layer and its announcement list. This repository is read-only and kept for its history.
+
 A tool to help sighted developers understand how screen reader users experience web pages.
 
 ![Screenshot](/Users/elizabethp/.gemini/antigravity/brain/80cd6039-b81b-45b7-9369-72af5730be63/ai_panel_display_1765648675967.png)
